@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业投递简历采集面板 · 详细说明</title>
+<meta name="description" content="按企业名称链式采集：企业 → 岗位 → 投递简历 → 完整简历内容，导出单表多页 Excel。">
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#fff; --text:#1a2233; --muted:#5b6b85; --border:#e4e9f2; --line:#eef2f8;
+    --b1:#25C2A8; --b2:#0E6E9E; --accent:#0F9C8A; --gold:#F5A623;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.75;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:.88em;
+       background:#e9f7f4;color:#0d5c50;padding:2px 7px;border-radius:6px;border:1px solid #cfeae3}
+  pre{background:#10283a;color:#d4ecf2;padding:20px 22px;border-radius:14px;overflow-x:auto;
+      font-size:13.2px;line-height:1.72;font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+  pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+
+  .topbar{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:58px}
+  .topbar a.back{font-size:14px;font-weight:600;color:#41506b}
+  .topbar a.back:hover{color:var(--accent);text-decoration:none}
+  .topbar .links{display:flex;gap:16px;font-size:13.5px}
+
+  .hero{background:linear-gradient(135deg,#25C2A8 0%,#0E6E9E 100%);color:#fff;padding:56px 0 60px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-150px;width:400px;height:400px;border-radius:50%;
+               background:radial-gradient(circle,rgba(255,255,255,.24),transparent 68%)}
+  .hero .wrap{position:relative;z-index:1;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+  .hero img{width:96px;height:96px;border-radius:22px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
+  .hero h1{font-size:32px;font-weight:800;letter-spacing:-.4px;margin-bottom:8px}
+  .hero .sub{font-size:15.5px;color:#d6f2ec}
+  .hero .pill{display:inline-block;font-size:12.5px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+              padding:4px 12px;border-radius:999px;margin-top:12px;margin-right:8px}
+
+  section{padding:46px 0}
+  section+section{padding-top:0}
+  h2{font-size:22px;font-weight:800;letter-spacing:-.2px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:5px;height:20px;border-radius:3px;background:linear-gradient(180deg,var(--b1),var(--b2))}
+  h3{font-size:16.5px;font-weight:700;margin:24px 0 10px;color:#1c3140}
+  .lead{color:var(--muted);font-size:14.5px;margin-bottom:22px}
+  p{font-size:14.8px;color:#3c4a63;margin-bottom:12px}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px 28px;margin-bottom:18px}
+
+  ul.list{list-style:none;display:flex;flex-direction:column;gap:10px;margin:12px 0}
+  ul.list li{font-size:14.5px;color:#3c4a63;padding-left:26px;position:relative}
+  ul.list li::before{content:"";position:absolute;left:0;top:9px;width:9px;height:9px;border-radius:50%;
+                     background:var(--accent);opacity:.85}
+  ul.list li b{color:#153a34}
+
+  .tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin:16px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.8px}
+  th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f4fbf9;font-weight:700;color:#20493f;font-size:12.8px}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#f8fdfc}
+  td.num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);white-space:nowrap}
+  td.mono code{white-space:nowrap;font-size:12.4px}
+
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .mini{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px}
+  .mini h4{font-size:14.8px;font-weight:700;margin-bottom:8px;color:#1c3140}
+  .mini p{font-size:13.6px;color:var(--muted);margin:0}
+
+  .note{background:#fff8e9;border:1px solid #f6e0b0;border-left:4px solid var(--gold);
+        border-radius:12px;padding:16px 20px;font-size:14px;color:#6b5320;margin:16px 0}
+  .note b{color:#8a6110}
+
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0}
+  .flow .node{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 18px;
+              font-size:14px;font-weight:600;color:#28404f;box-shadow:0 2px 8px rgba(26,34,51,.05)}
+  .flow .arw{color:var(--accent);font-weight:800;font-size:18px}
+
+  .tree{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 24px;
+        font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:13.2px;line-height:1.9;color:#38465f;white-space:pre;overflow-x:auto}
+
+  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}
+  .stat .box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;text-align:center}
+  .stat .box .v{font-size:26px;font-weight:800;color:var(--accent);letter-spacing:-.5px}
+  .stat .box .k{font-size:13px;color:var(--muted);margin-top:4px}
+
+  footer{background:#111a2c;color:#93a3c0;padding:30px 0;font-size:13.4px;margin-top:20px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer a{color:#b9caea;border-bottom:1px dotted #43536f}
+  footer a:hover{color:#fff;text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <a class="back" href="../index.html">← 返回合集首页</a>
+    <div class="links">
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels">仓库</a>
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels/releases">下载 exe</a>
+    </div>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="wrap">
+    <img src="src/icon_preview.png" alt="图标">
+    <div>
+      <h1>企业投递简历采集面板</h1>
+      <div class="sub">从一家企业出发，把「发布了哪些岗位 · 谁投了简历 · 简历里写了什么」一次拿全</div>
+      <div>
+        <span class="pill">端口 8790</span>
+        <span class="pill">Flask + BeautifulSoup</span>
+        <span class="pill">单表多页 Excel</span>
+        <span class="pill">Windows 单文件 exe</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>这个工具是做什么的</h2>
+    <p class="lead">输入一个企业名称（支持模糊），它会顺着招聘后台的链路一路走到底，把投递简历和简历正文整成一份 Excel。</p>
+    <div class="panel">
+      <p>
+        招聘后台里，想知道「某企业收到了哪些投递、投递人是什么背景」，需要手工点开企业 → 岗位 → 投递列表 → 每份简历详情，
+        几百份简历点下来非常费时。这个面板把整条链路自动化：企业名称模糊搜索 → 拿到企业账号 → 拉取该企业全部岗位 →
+        逐个岗位拉取投递简历列表 → 再逐份抓取完整简历详情 → 汇总导出。
+      </p>
+      <div class="flow">
+        <span class="node">企业名称</span><span class="arw">→</span>
+        <span class="node">企业账号</span><span class="arw">→</span>
+        <span class="node">岗位列表</span><span class="arw">→</span>
+        <span class="node">投递简历</span><span class="arw">→</span>
+        <span class="node">简历详情</span><span class="arw">→</span>
+        <span class="node">Excel</span>
+      </div>
+      <ul class="list">
+        <li><b>企业模糊搜索</b>：输入「宝顺」「物流有限公司」这类关键词即可命中，不用完整全称。</li>
+        <li><b>岗位列表可单独用</b>：选定企业后可以先只看它发布了哪些岗位、每个岗位收到多少投递。</li>
+        <li><b>投递明细</b>：投递人姓名、投递时间、电话 / 邮箱 / QQ（这里电话是<b>明文</b>，无需 OCR）。</li>
+        <li><b>简历深度解析</b>：基本信息、期望职位与薪资、自我描述、工作经历、教育经历、语言能力、证书、头像照片。</li>
+        <li><b>导出可勾选</b>：只要岗位列表 / 只要投递简历 / 两者都要，三种组合任选，文件名自动区分。</li>
+        <li><b>并发抓取</b>：岗位投递与简历详情都用线程池（默认 6 线程），500+ 份简历约 1 分钟抓完。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>接口链路（全部实测可用）</h2>
+    <p class="lead">登录后台 Cookie 即可，无需前端网站 Cookie。四个关键接口串起整条流程。</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:20%">环节</th><th style="width:48%">接口</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>① 企业模糊搜索</td>
+            <td class="mono"><code>GET /Enterprise/GetCompanyListData</code><br><code>?keyword=关键词&amp;keyType=1&amp;openSource=0</code></td>
+            <td><b>keyType=1 才是模糊搜索</b>；keyType=0 表示不筛选，会返回全量企业</td>
+          </tr>
+          <tr>
+            <td>② 岗位列表</td>
+            <td class="mono"><code>GET /Post/GetYZJobList?key={企业username}</code></td>
+            <td>兼职岗位走 <code>/Post/GetJZ_YZJobList</code></td>
+          </tr>
+          <tr>
+            <td>③ 岗位投递简历</td>
+            <td class="mono"><code>GET /Post/GetSendJlList</code><br><code>?jobid={岗位id}&amp;istj=-1&amp;infotype=1</code></td>
+            <td>分页返回：投递人、时间、电话、邮箱、QQ、姓名、简历ID</td>
+          </tr>
+          <tr>
+            <td>④ 简历详情</td>
+            <td class="mono"><code>GET /Post/JlEdit?source=1&amp;jlid={简历id}</code></td>
+            <td>服务端渲染<b>完整简历表单</b>，后台 Cookie 即可拿到全部字段</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <b>为什么不用前台页面？</b>前台简历页（<code>www.hbtc.ccoo.cn/post/qiuzhi/{id}x.html</code>）需要<b>前台登录</b>，
+      匿名或后台 Cookie 只会返回登录页。而后台的简历编辑页 <code>/Post/JlEdit</code> 用后台 Cookie 就能拿到全部内容，
+      所以走这条路线。导出时仍会生成前台简历链接，方便人工复核。
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>简历里能拿到哪些字段</h2>
+    <p class="lead">导出「投递简历」工作表共 47 列，另有 1 个「岗位列表」工作表 7 列。</p>
+
+    <div class="stat">
+      <div class="box"><div class="v">47</div><div class="k">投递简历表列数</div></div>
+      <div class="box"><div class="v">28</div><div class="k">基础字段</div></div>
+      <div class="box"><div class="v">19</div><div class="k">经历/语言/证书展开列</div></div>
+      <div class="box"><div class="v">14</div><div class="k">次要列默认隐藏</div></div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:24%">分组</th><th>字段</th></tr></thead>
+        <tbody>
+          <tr><td>归属信息</td><td>序号、企业名称、企业用户名、岗位ID、岗位名称、岗位链接、简历ID、简历链接、投递时间</td></tr>
+          <tr><td>基本信息</td><td>姓名、性别、年龄、出生年、学历、专业、工作经验、求职状态</td></tr>
+          <tr><td>求职意向</td><td>期望职位、期望月薪</td></tr>
+          <tr><td>联系方式</td><td>电话、邮箱、籍贯、居住地、毕业学校</td></tr>
+          <tr><td>简历正文</td><td>自我描标签（个人亮点）、自我描述详情、头像、照片</td></tr>
+          <tr><td>经历展开</td><td>工作经历 1–8、教育经历 1–5、语言能力 1–3、获得证书 1–3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      其中 <b>14 个次要列默认隐藏</b>（出生年、毕业学校、头像、照片、专业、工作经历 7–8、教育经历 3–5、语言能力 2–3、获得证书 2–3），
+      在 Excel 里整体取消隐藏即可看到。
+    </p>
+
+    <h3>解析要点</h3>
+    <ul class="list">
+      <li>自我描述是富文本，存在 <code>&lt;input id="text_merecord"&gt;</code> 的 <code>value</code> 里，含 <code>&lt;br&gt;</code> 等 HTML，导出前会清洗成纯文本。</li>
+      <li>求职状态取 radio <code>name=jlstate</code> 的 <code>title</code>；个人亮点取 checkbox <code>name=liangdian</code>（可多个）。</li>
+      <li>工作经历取 <code>ul.js-work-list li.item</code>，其中结束年 <code>value='0'</code> 表示「至今」。</li>
+      <li>证书必须要求证书名非空才收录（日期控件带占位默认值，否则会写入假数据）。</li>
+      <li>页面里的 <code>&lt;ul&gt;</code> 总含 1 个供前端克隆的空模板项，解析时会过滤掉。</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>使用流程</h2>
+    <div class="grid2">
+      <div class="mini"><h4>① 登录 / 填 Cookie</h4><p>在配置区填后台账号密码，或粘贴 Cookie，点「测试」验证。</p></div>
+      <div class="mini"><h4>② 搜索企业</h4><p>输入企业名称关键词做模糊搜索，从结果里选中目标企业。</p></div>
+      <div class="mini"><h4>③ 取岗位列表</h4><p>可选：先拉取该企业的岗位列表，确认要采集哪些岗位的投递。</p></div>
+      <div class="mini"><h4>④ 抓取投递与简历</h4><p>点开始抓取，面板并发拉取投递列表与每份简历详情，进度实时显示。</p></div>
+      <div class="mini"><h4>⑤ 勾选导出内容</h4><p>选择「仅岗位列表 / 仅投递简历 / 两者都要」，选好目录导出 Excel。</p></div>
+      <div class="mini"><h4>⑥ 查看结果</h4><p>Excel 冻结首行 + 自动筛选 + 超链接，岗位名/简历名可直接点开对应网页。</p></div>
+    </div>
+
+    <h3>实测性能</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>测试对象</th><th>规模</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td>湖北宝顺物流有限公司</td><td>6 个岗位 / 523 条投递 / 502 份简历详情</td><td>约 <b>53 秒</b>完成，导出 524 KB</td></tr>
+          <tr><td>导出组合验证</td><td>仅岗位列表 / 仅投递简历 / 两者都要</td><td>三档均正常，文件名自动区分</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>目录结构与运行方式</h2>
+    <div class="tree">resume-panel/
+├── index.html                    ← 本说明页
+├── README.md
+└── src/
+    ├── 面板.py                    # 主程序（Flask 服务 + 链路抓取 + 导出）
+    ├── static/
+    │   └── index.html             # 面板前端页面
+    ├── 打包exe.py                 # 一键 PyInstaller 打包脚本
+    ├── 启动面板.bat               # 源码启动（双击）
+    ├── 企业投递简历采集面板.spec   # PyInstaller 配置
+    ├── app.ico                    # 应用图标
+    ├── icon_preview.png           # 图标预览
+    └── config.example.json        # 配置模板（复制为 config.json 后填写）</div>
+
+    <h3>方式一：直接运行 exe（推荐）</h3>
+    <p>到 <a href="https://github.com/chenzhuanxin/hbtc-data-panels/releases">Release 页面</a>下载
+      <code>ResumeCollector-v1.0.0-windows-x64.exe</code>，放到单独目录双击运行，浏览器会自动打开
+      <code>http://127.0.0.1:8790</code>。</p>
+
+    <h3>方式二：源码运行</h3>
+<pre><code># 1) 安装依赖
+pip install flask requests beautifulsoup4 lxml openpyxl
+
+# 2) 准备配置（首次，必须有 config.json，否则 Cookie 为空会返回登录页）
+cd src
+copy config.example.json config.json    # 然后填入账号/密码/Cookie
+
+# 3) 启动
+python -X utf8 面板.py
+# 浏览器自动打开 http://127.0.0.1:8790</code></pre>
+
+    <h3>重新打包 exe</h3>
+<pre><code>pip install pyinstaller
+cd src
+python 打包exe.py
+# 产物：dist/企业投递简历采集面板.exe</code></pre>
+
+    <div class="note">
+      <b>注意：</b>首次运行务必先把 <code>config.example.json</code> 复制为 <code>config.json</code> 再启动。
+      若 <code>config.json</code> 不存在或 Cookie 为空，后台会返回登录页 HTML，脚本解析 JSON 时会报
+      <code>JSONDecodeError</code>。
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>常见问题</h2>
+    <div class="panel">
+      <h3>企业搜不到怎么办？</h3>
+      <p>换成企业全称里的关键片段，例如「宝顺」「物流有限公司」。如果关键词太短可能命中很多家，面板会列出结果让你挑选。</p>
+
+      <h3>为什么有些岗位投递数是 0？</h3>
+      <p>该岗位确实没有收到投递，属正常情况；导出时仍会保留岗位列表。</p>
+
+      <h3>改了代码后测试拿到的还是旧数据？</h3>
+      <p>多半是端口被上一轮的旧进程占着，新进程绑定失败静默退出。用
+        <code>netstat -ano | findstr :8790</code> 找到 PID 结束掉，再重启。</p>
+
+      <h3>电话需要 OCR 吗？</h3>
+      <p>不需要。这个面板拿到的投递人电话是<b>明文</b>（与「简历库」列表接口不同，那里才是图片）。</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>企业投递简历采集面板 · 仅供授权账号内部数据整理使用</div>
+    <div>
+      <a href="../index.html">合集首页</a> &nbsp;·&nbsp;
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

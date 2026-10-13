@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>城市中国 · 湖北通城网 数据采集面板合集</title>
+<meta name="description" content="面向 城市中国·湖北通城网（hbtc.ccoo.cn）招聘频道的两款 Windows 采集面板：7 类平台数据面板 + 企业投递简历采集面板。">
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --text:#1a2233; --muted:#5b6b85;
+    --border:#e4e9f2; --line:#eef2f8;
+    --a1:#5B8CFF; --a2:#2A46C8; --accent:#3B6BF0;
+    --b1:#25C2A8; --b2:#0E6E9E; --teal:#0F9C8A;
+    --gold:#F5A623;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.7; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    background:linear-gradient(135deg,#1b2a4a 0%,#223a6b 45%,#2a4f8f 100%);
+    color:#fff;padding:72px 0 84px;position:relative;overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;right:-140px;top:-140px;width:460px;height:460px;border-radius:50%;
+    background:radial-gradient(circle,rgba(91,140,255,.42),transparent 68%);
+  }
+  .hero::before{
+    content:"";position:absolute;left:-100px;bottom:-160px;width:380px;height:380px;border-radius:50%;
+    background:radial-gradient(circle,rgba(37,194,168,.30),transparent 68%);
+  }
+  .hero .wrap{position:relative;z-index:1}
+  .badge{
+    display:inline-block;font-size:13px;letter-spacing:.6px;padding:5px 14px;border-radius:999px;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);margin-bottom:20px;
+  }
+  .hero h1{font-size:40px;line-height:1.28;font-weight:800;letter-spacing:-.5px;margin-bottom:16px}
+  .hero h1 span{
+    background:linear-gradient(90deg,#8fb4ff,#5fe0c6);-webkit-background-clip:text;
+    background-clip:text;color:transparent;
+  }
+  .hero p{font-size:16.5px;color:#c8d6ef;max-width:760px;margin-bottom:28px}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:12px}
+  .chip{
+    font-size:13.5px;color:#dbe6fa;background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);padding:6px 14px;border-radius:8px;
+  }
+
+  /* ---------- Section ---------- */
+  section{padding:64px 0}
+  .sec-title{font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:10px}
+  .sec-sub{color:var(--muted);font-size:15px;margin-bottom:36px}
+
+  /* ---------- Cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:26px}
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;
+    display:flex;flex-direction:column;transition:.25s;box-shadow:0 2px 10px rgba(26,34,51,.05);
+  }
+  .card:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(26,34,51,.13);border-color:#cfdcef}
+  .card-top{padding:28px 28px 22px;display:flex;gap:18px;align-items:flex-start}
+  .card-top img{width:74px;height:74px;border-radius:17px;flex:0 0 auto;box-shadow:0 6px 18px rgba(26,34,51,.16)}
+  .card-top h3{font-size:20px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
+  .card-top .tag{font-size:13px;color:var(--muted)}
+  .card-body{padding:0 28px 24px;flex:1}
+  .card-body p{font-size:14.5px;color:#41506b;margin-bottom:16px}
+  .feat{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .feat li{font-size:14px;color:#3c4a63;padding-left:22px;position:relative}
+  .feat li::before{
+    content:"";position:absolute;left:0;top:8px;width:9px;height:9px;border-radius:50%;
+    background:var(--accent);opacity:.85;
+  }
+  .card.b .feat li::before{background:var(--teal)}
+  .card-foot{
+    padding:18px 28px 24px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;
+  }
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;
+    padding:9px 18px;border-radius:10px;border:1px solid var(--border);background:#fff;
+    color:#33415c;transition:.18s;cursor:pointer;
+  }
+  .btn:hover{background:#f1f5fc;border-color:#c9d8ee}
+  .btn.primary{background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;border-color:transparent}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.teal{background:linear-gradient(135deg,var(--b1),var(--b2));color:#fff;border-color:transparent}
+  .btn.teal:hover{filter:brightness(1.08)}
+
+  /* ---------- Table ---------- */
+  .tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:12px 18px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#f7f9fd;font-weight:700;color:#33415c;font-size:13px;letter-spacing:.2px}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fafcff}
+  td.num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent)}
+
+  /* ---------- Steps ---------- */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px}
+  .step .n{
+    width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:15px;color:#fff;background:linear-gradient(135deg,var(--a1),var(--a2));margin-bottom:12px;
+  }
+  .step h4{font-size:15.5px;font-weight:700;margin-bottom:6px}
+  .step p{font-size:13.5px;color:var(--muted);line-height:1.65}
+
+  footer{background:#111a2c;color:#93a3c0;padding:36px 0;font-size:13.5px;margin-top:24px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+  footer a{color:#b9caea;border-bottom:1px dotted #43536f}
+  footer a:hover{color:#fff}
+
+  @media(max-width:640px){
+    .hero h1{font-size:29px}
+    .cards{grid-template-columns:1fr}
+    .card-top{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="badge">城市中国 · 湖北通城网｜招聘频道数据工具</div>
+    <h1>两款采集面板，一套 <span>招聘数据工作流</span></h1>
+    <p>
+      针对 <strong>城市中国 · 湖北通城网（hbtc.ccoo.cn）</strong> 招聘后台打造的两款本地面板工具：
+      一款把平台 7 大类目数据（含图片电话 OCR）整表导出 Excel，一款顺着「企业 → 岗位 → 投递简历 → 完整简历」把投递明细一网打尽。
+      均为 Python + Flask 本地服务 + 浏览器界面，打包为 Windows 单文件 exe，双击即用。
+    </p>
+    <div class="hero-meta">
+      <span class="chip">Windows 单文件 exe</span>
+      <span class="chip">本地运行 · 数据不上传</span>
+      <span class="chip">Excel / ZIP 导出</span>
+      <span class="chip">离线 OCR</span>
+      <span class="chip">并发抓取</span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2 class="sec-title">两个子项目</h2>
+    <p class="sec-sub">点击卡片进入各自的详细说明页；可执行文件在 Release 中下载。</p>
+
+    <div class="cards">
+
+      <!-- 项目一 -->
+      <div class="card a">
+        <div class="card-top">
+          <img src="city-data-panel/src/icon_preview.png" alt="平台数据面板图标">
+          <div>
+            <h3>城市中国平台数据面板</h3>
+            <div class="tag">city-data-panel ｜ 端口 8787</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>一键抓取招聘后台 <strong>7 个类目</strong>的全量数据，自动识别电话图片并转文字，按参考格式导出 Excel。</p>
+          <ul class="feat">
+            <li>7 类目全覆盖：订单管理 / 全职岗位 / 兼职岗位 / 企业库 / 会员企业 / 简历库 / 注册用户</li>
+            <li>base64 图片电话自动 OCR（RapidOCR 离线识别，无需联网）</li>
+            <li>类目勾选导出：单类目 = 一个 xlsx，多类目 = 自动打 zip 包</li>
+            <li>保留全部字段，次要列自动隐藏；非法字符自动清洗</li>
+            <li>并发分页抓取，7 类目共 9.8 万条也能快速拉完</li>
+          </ul>
+        </div>
+        <div class="card-foot">
+          <a class="btn primary" href="city-data-panel/index.html">查看详细说明 →</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.0.0/CityDataPanel-v1.0.0-windows-x64.exe">下载 exe</a>
+        </div>
+      </div>
+
+      <!-- 项目二 -->
+      <div class="card b">
+        <div class="card-top">
+          <img src="resume-panel/src/icon_preview.png" alt="企业投递简历采集面板图标">
+          <div>
+            <h3>企业投递简历采集面板</h3>
+            <div class="tag">resume-panel ｜ 端口 8790</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>按企业名称出发，顺着 <strong>企业 → 岗位 → 投递简历 → 简历详情</strong> 一链到底，输出单表多页 Excel。</p>
+          <ul class="feat">
+            <li>企业名称模糊搜索，选企业后可单独查该企业的岗位列表</li>
+            <li>岗位投递明细：投递人、时间、联系方式（明文电话/邮箱/QQ）</li>
+            <li>简历内容深度解析：基本信息、期望职位薪资、自我描述、工作/教育经历、语言与证书</li>
+            <li>导出可勾选：仅岗位列表 / 仅投递简历 / 两者都要</li>
+            <li>并发抓取 6 线程，500+ 份简历详情约 1 分钟抓完</li>
+          </ul>
+        </div>
+        <div class="card-foot">
+          <a class="btn teal" href="resume-panel/index.html">查看详细说明 →</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.0.0/ResumeCollector-v1.0.0-windows-x64.exe">下载 exe</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec-title">数据规模（实测）</h2>
+    <p class="sec-sub">城市中国平台数据面板首次全量抓取的实际行数，合计 98,657 条。</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:34%">类目</th><th style="width:22%">数据行数</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>订单管理</td><td class="num">4,203</td><td>收入/订单流水，含订单号、金额、来源</td></tr>
+          <tr><td>全职岗位</td><td class="num">719</td><td>全职招聘岗位，含联系方式与发布信息</td></tr>
+          <tr><td>兼职岗位</td><td class="num">23</td><td>兼职招聘岗位</td></tr>
+          <tr><td>企业库</td><td class="num">4,735</td><td>平台企业主体名录</td></tr>
+          <tr><td>会员企业</td><td class="num">198</td><td>付费会员企业</td></tr>
+          <tr><td>简历库</td><td class="num">15,733</td><td>求职简历，电话字段为图片</td></tr>
+          <tr><td>注册用户</td><td class="num">73,046</td><td>站点注册用户，手机号字段为图片</td></tr>
+          <tr><td style="font-weight:700">合计</td><td class="num">98,657</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec-title">使用方式</h2>
+    <p class="sec-sub">两种方式选其一：直接跑 exe，或用源码启动。</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <h4>下载 exe</h4>
+        <p>到 Release 页面下载对应的 <code>.exe</code> 文件，放到任意目录（建议单独建一个文件夹）。</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h4>双击启动</h4>
+        <p>双击 exe，控制台窗口会自动打开浏览器面板；关闭窗口即停止服务。</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h4>填写账号 / Cookie</h4>
+        <p>在面板里填入后台账号密码，或直接粘贴登录后的 Cookie，点「测试」验证有效性。</p>
+      </div>
+      <div class="step">
+        <div class="n">4</div>
+        <h4>抓取并导出</h4>
+        <p>选择类目 / 企业后开始抓取，完成后勾选需要的类目导出到指定目录。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>城市中国 · 湖北通城网 数据采集面板合集 &nbsp;·&nbsp; 仅供授权账号内部数据整理使用</div>
+    <div>
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels">GitHub 仓库</a> &nbsp;·&nbsp;
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels/releases">Release 下载</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
