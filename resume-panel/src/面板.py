@@ -29,6 +29,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
+import resume_front as RF
+
 sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
 sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
 
@@ -102,18 +104,22 @@ def resume_link(jlid):
 
 # ----------------------------------------------------------------------
 # 导出列定义
+#
+# 简历内容改为抓取【前台简历详情页】www.hbtc.ccoo.cn/post/qiuzhi/{jlid}x.html
+# （后台 /Post/JlEdit 字段不全，只能拿部分内容）。
+# 因此列集合与 resume_front.DETAIL_COLS 对齐，保证详情可直接按列名合并。
 # ----------------------------------------------------------------------
-WORK_COLS = 8     # 工作经历 1-8
-EDU_COLS = 5      # 教育经历 1-5
-LANG_COLS = 3     # 语言能力 1-3
-CERT_COLS = 3     # 获得证书 1-3
+WORK_COLS = RF.WORK_COLS     # 工作经历 1-10
+EDU_COLS = RF.EDU_COLS       # 教育经历 1-5
+LANG_COLS = RF.LANG_COLS     # 语言能力 1-5
+CERT_COLS = RF.CERT_COLS     # 获得证书 1-5
 
 BASE_COLS = ['序号', '企业名称', '企业用户名', '岗位ID', '岗位名称', '岗位链接',
              '简历ID', '简历链接', '投递时间',
-             '姓名', '性别', '年龄', '出生年', '学历', '专业', '工作经验',
-             '求职状态', '期望职位', '期望月薪',
-             '电话', '邮箱', '籍贯', '居住地', '毕业学校',
-             '自我描标签', '自我描述详情', '头像', '照片']
+             '姓名', '性别', '年龄', '学历', '工作经验', '现居地',
+             '求职状态', '期望职位', '职位类别', '期望月薪',
+             '电话', '邮箱', 'QQ',
+             '自我描述标签', '自我描述详情', '头像', '照片']
 COLS = (BASE_COLS
         + [f'工作经历{i}' for i in range(1, WORK_COLS + 1)]
         + [f'教育经历{i}' for i in range(1, EDU_COLS + 1)]
@@ -121,11 +127,11 @@ COLS = (BASE_COLS
         + [f'获得证书{i}' for i in range(1, CERT_COLS + 1)])
 
 # 次要字段：保留但默认隐藏（在 Excel 中可手动取消隐藏）
-HIDDEN_COLS = {'出生年', '毕业学校', '头像', '照片', '专业',
-               '工作经历7', '工作经历8',
+HIDDEN_COLS = {'头像', '照片',
+               '工作经历7', '工作经历8', '工作经历9', '工作经历10',
                '教育经历3', '教育经历4', '教育经历5',
-               '语言能力2', '语言能力3',
-               '获得证书2', '获得证书3'}
+               '语言能力2', '语言能力3', '语言能力4', '语言能力5',
+               '获得证书3', '获得证书4', '获得证书5'}
 
 JOB_SHEET_COLS = ['序号', '岗位类型', '岗位ID', '岗位名称', '岗位链接', '投递简历数', '发布时间']
 JOB_SHEET_HIDDEN = set()
@@ -136,7 +142,8 @@ JOB_SHEET_HIDDEN = set()
 # ----------------------------------------------------------------------
 CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
-                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 6}
+                  'front_cookie': '',
+                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 8}
 
 
 def load_config():
@@ -676,14 +683,33 @@ def parse_resume_html(html, jlid=''):
 
 
 def fetch_resume_detail(jlid):
-    """抓取并解析单份简历（后台编辑页，服务端渲染完整简历内容）"""
+    """
+    抓取并解析单份简历。
+
+    主路径：**前台简历详情页** www.hbtc.ccoo.cn/post/qiuzhi/{jlid}x.html
+            —— 字段最全（含工作经历1-10 / 教育经历 / 语言能力 / 证书 / 职位类别 / 现居地），
+               必须带前台登录 Cookie。
+    兜底：后台 /Post/JlEdit（字段较少，仅在前台 Cookie 未配置或失效时使用）
+    """
+    fc = CONFIG.get('front_cookie') or ''
+    if RF.normalize_cookie(fc):
+        d = RF.fetch_one(jlid, fc)
+        if d and not d.get('_error'):
+            return d
+    # ---- 兜底：后台编辑页 ----
     try:
         r = api_get('/Post/JlEdit', {'source': 1, 'jlid': jlid},
                     timeout=30, referer=BASE_URL + '/Post/JobJlList')
         r.encoding = 'utf-8'
         if r.status_code != 200 or len(r.text) < 2000:
             return {'简历ID': jlid, '简历链接': resume_link(jlid)}
-        return parse_resume_html(r.text, jlid)
+        d = parse_resume_html(r.text, jlid)
+        # 旧列名映射到新列名
+        if d.get('自我描标签') and not d.get('自我描述标签'):
+            d['自我描述标签'] = d['自我描标签']
+        if d.get('居住地') and not d.get('现居地'):
+            d['现居地'] = d['居住地']
+        return d
     except Exception as e:
         print(f'[简历详情] {jlid} 失败: {e}')
         return {'简历ID': jlid, '简历链接': resume_link(jlid)}
@@ -756,10 +782,12 @@ def build_rows(apps, jobs_by_id, company):
             row['电话'] = a.get('tel_str') or ''
         if not row['期望职位'] and a.get('title'):
             row['期望职位'] = a['title']
-        if not row['居住地'] and a.get('telarea'):
-            row['居住地'] = a['telarea']
+        if not row['现居地'] and a.get('telarea'):
+            row['现居地'] = a['telarea']
         if not row['邮箱']:
             row['邮箱'] = a.get('email') or ''
+        if not row['QQ']:
+            row['QQ'] = a.get('qq') or ''
         rows.append(row)
     return rows
 
@@ -769,7 +797,7 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
     try:
         FETCHING['on'] = True
         scale = int(CONFIG.get('ocr_scale') or 1)
-        workers = max(1, min(12, int(CONFIG.get('fetch_workers') or 6)))
+        workers = max(1, min(16, int(CONFIG.get('fetch_workers') or 8)))
         ocr_fn = (lambda s: ocr_base64_image(s, scale)) if use_ocr else None
         job_total = len(jobs)
         _prog(phase='running', msg=f'开始抓取 {job_total} 个职位的投递简历…',
@@ -816,7 +844,7 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
         with ThreadPoolExecutor(max_workers=workers) as ex:
             list(ex.map(one, jobs))
 
-        # 简历详情
+        # 简历详情（前台简历详情页，字段最全）
         if fetch_detail:
             jlids = []
             seen = set()
@@ -827,21 +855,44 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
                     jlids.append(jl)
             _prog(detail_total=len(jlids), msg=f'正在抓取 {len(jlids)} 份简历内容…')
             det_map = {}
-            dn = [0]
+            need_login = 0
+            fck = CONFIG.get('front_cookie') or ''
 
-            def one_detail(jl):
-                d = fetch_resume_detail(jl)
-                with lock:
-                    det_map[str(jl)] = d
-                    dn[0] += 1
-                    if dn[0] % 5 == 0 or dn[0] == len(jlids):
-                        _prog(detail_done=dn[0],
-                              msg=f'简历内容 {dn[0]}/{len(jlids)} …')
+            if RF.normalize_cookie(fck) and jlids:
+                def onp(done, total, ok, fail):
+                    if done % 5 == 0 or done == total:
+                        _prog(detail_done=done,
+                              msg=f'简历详情 {done}/{total}（成功 {ok} / 失败 {fail}）…')
+                got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp)
+                det_map = {str(k): v for k, v in got.items()}
+                need_login = int(stat.get('need_login') or 0)
+                print(f'[简历详情] 前台抓取 成功 {stat["ok"]} 失败 {stat["fail"]} '
+                      f'需登录 {need_login}')
 
-            with ThreadPoolExecutor(max_workers=workers) as ex:
-                list(ex.map(one_detail, jlids))
+            # 未取到的（未配置前台 Cookie / Cookie 失效 / 个别失败）用后台页兜底
+            miss = [j for j in jlids if str(j) not in det_map]
+            if miss:
+                _prog(msg=f'有 {len(miss)} 份未取到前台详情，改用后台兜底抓取…')
+                dn = [0]
+
+                def one_detail(jl):
+                    d = fetch_resume_detail(jl)
+                    with lock:
+                        det_map[str(jl)] = d
+                        dn[0] += 1
+                        if dn[0] % 5 == 0 or dn[0] == len(miss):
+                            _prog(detail_done=len(det_map),
+                                  msg=f'兜底抓取 {dn[0]}/{len(miss)} …')
+
+                with ThreadPoolExecutor(max_workers=workers) as ex:
+                    list(ex.map(one_detail, miss))
+
             for a in apps:
                 a['detail'] = det_map.get(str(a.get('jlid')))
+
+            if need_login and need_login == len(jlids):
+                _prog(msg=f'⚠ {need_login} 份简历全部返回登录页：前台 Cookie 已失效，'
+                          f'请在「连接设置」中更新前台 Cookie 后重抓')
 
         _persist_ocr_cache()
 
@@ -1082,9 +1133,14 @@ def api_config_set():
     global CONFIG
     d = request.get_json(force=True, silent=True) or {}
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'front_cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
+        if 'fetch_workers' in d:
+            try:
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
+            except (TypeError, ValueError):
+                pass
         if 'ocr_scale' in d:
             try:
                 CONFIG['ocr_scale'] = max(1, min(20, int(d['ocr_scale'])))
@@ -1110,9 +1166,14 @@ def api_config_import():
     if not isinstance(d, dict):
         return jsonify({'ok': False, 'msg': '不是有效的 JSON 配置文件'})
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'front_cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
+        if 'fetch_workers' in d:
+            try:
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
+            except (TypeError, ValueError):
+                pass
         if 'ocr_scale' in d:
             try:
                 CONFIG['ocr_scale'] = max(1, min(20, int(d['ocr_scale'])))
@@ -1181,6 +1242,24 @@ def api_test_cookie():
         ck = CONFIG.get('cookie', '')
     ok, msg = test_cookie(str(ck))
     return jsonify({'ok': ok, 'msg': msg})
+
+
+@app.route('/api/front_test', methods=['POST'])
+def api_front_test():
+    """测试「前台 Cookie」是否可用于抓取简历详情页"""
+    global CONFIG
+    d = request.get_json(force=True, silent=True) or {}
+    ck = d.get('front_cookie')
+    if ck is None:
+        ck = CONFIG.get('front_cookie', '')
+    ck = str(ck)
+    ok, msg, sample = RF.test_front_cookie(ck)
+    if ok and ck:
+        with CONFIG_LOCK:
+            CONFIG['front_cookie'] = ck
+            save_config(CONFIG)
+            CONFIG = load_config()
+    return jsonify({'ok': ok, 'msg': msg, 'sample': sample})
 
 
 @app.route('/api/search_company', methods=['POST'])

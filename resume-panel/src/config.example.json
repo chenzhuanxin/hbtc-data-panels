@@ -2,7 +2,8 @@
   "username": "",
   "password": "",
   "cookie": "",
+  "front_cookie": "",
   "save_dir": "",
   "ocr_scale": 1,
-  "fetch_workers": 6
+  "fetch_workers": 8
 }

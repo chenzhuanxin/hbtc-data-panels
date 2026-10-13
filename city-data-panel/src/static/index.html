@@ -93,6 +93,21 @@ tbody tr:nth-child(even){background:#fafbfe}
     </div>
     <label class="f" style="width:100%">Cookie（从浏览器登录后台后复制，分号分隔）</label>
     <textarea id="cookie" placeholder="ccoocitycrm=...; ASP.NET_SessionId=...; siteid="></textarea>
+
+    <label class="f" style="width:100%;margin-top:12px">
+      前台 Cookie
+      <b style="color:#e0552b">（抓取简历库完整内容必需）</b>
+    </label>
+    <textarea id="frontCookie" placeholder="登录 www.hbtc.ccoo.cn 后复制：PHPSESSID=...; ccoo=logintime=...&amp;uid=...; siteid=880; sitename=..."></textarea>
+    <div class="row" style="margin-top:8px;gap:10px;align-items:center">
+      <button class="ghost" onclick="App.testFrontCookie()">测试前台 Cookie</button>
+      <span id="frontMsg" class="msg"></span>
+      <span class="muted">
+        简历库的完整内容（工作经历 1-10 / 教育经历 / 语言能力 / 获得证书 / 职位类别 / 现居地）
+        来自前台简历页 <code>/post/qiuzhi/{id}x.html</code>，需要前台登录 Cookie。
+        不填则简历库只有列表字段。
+      </span>
+    </div>
     <div class="row" style="margin-top:10px">
       <button onclick="App.saveConfig()">保存配置</button>
       <button class="ghost" onclick="App.testCookie()">测试连接</button>
@@ -109,6 +124,11 @@ tbody tr:nth-child(even){background:#fafbfe}
       <h2 style="margin-bottom:0">② 数据抓取</h2>
       <div class="row">
         <span class="kv">单类目限抓页数(0=全部) <input type="text" id="maxPages" value="0" style="width:60px"></span>
+        <label class="kv" title="抓取简历库后，自动逐份打开前台简历详情页，补全工作经历/教育经历/语言/证书等全量字段（需要前台 Cookie）">
+          <input type="checkbox" id="withDetail" checked> 抓取简历详情（全量）
+        </label>
+        <span class="kv">详情限抓条数(0=全部) <input type="text" id="detailLimit" value="0" style="width:70px"></span>
+        <button class="ghost" onclick="App.enrichResume()">只补抓简历库详情</button>
         <button class="ghost" onclick="App.fetchAll()">一键抓取全部类目</button>
       </div>
     </div>
@@ -175,7 +195,11 @@ const App=(()=>{
     const cfg=await jget('/api/config');
     $('#username').value=cfg.username||''; $('#password').value=cfg.password||'';
     $('#cookie').value=cfg.cookie||''; $('#saveDir').value=cfg.save_dir||'';
+    $('#frontCookie').value=cfg.front_cookie||'';
     $('#ocrScale').value=cfg.ocr_scale||1;
+    if($('#withDetail')) $('#withDetail').checked=(cfg.fetch_resume_detail===undefined?true:!!cfg.fetch_resume_detail);
+    if($('#detailLimit')) $('#detailLimit').value=cfg.resume_detail_limit||0;
+    if(!cfg.front_cookie) flash($('#frontMsg'),'未配置前台 Cookie，简历库将没有完整内容','warn');
     const c=await jget('/api/categories');
     CATS=c.cats; INFO=c.info; HIDDEN=c.hidden; ZH=c.zh; EN=c.en;
     renderCats(c.unavailable); renderTabs(); renderExportCats();
@@ -309,8 +333,26 @@ const App=(()=>{
   }
   function page(dv){const pages=Math.max(1,Math.ceil(curTotal/50));curPage=Math.min(pages,Math.max(1,curPage+dv));loadData();}
 
-  async function fetchOne(c){await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true});}
-  async function fetchAll(){for(const c of CATS){await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true});}}
+  async function fetchOne(c){
+    await saveConfig();
+    await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,
+      with_detail:$('#withDetail')&&$('#withDetail').checked});
+  }
+  async function fetchAll(){
+    await saveConfig();
+    const wd=$('#withDetail')?$('#withDetail').checked:true;
+    for(const c of CATS){await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,with_detail:wd});}
+  }
+  async function testFrontCookie(){
+    flash($('#frontMsg'),'正在测试前台 Cookie…','warn');
+    const r=await jpost('/api/front_test',{front_cookie:$('#frontCookie').value});
+    flash($('#frontMsg'),(r.ok?'✔ ':'✘ ')+r.msg,r.ok?'ok':'err');
+  }
+  async function enrichResume(){
+    await saveConfig();
+    flash($('#frontMsg'),'已开始补抓简历库详情，请看抓取进度…','warn');
+    await jpost('/api/enrich_resume',{});
+  }
 
   let pollTimer=null;
   async function pollProgress(){
@@ -356,7 +398,10 @@ const App=(()=>{
   // ---- 配置 ----
   async function saveConfig(){
     await jpost('/api/config',{username:$('#username').value,password:$('#password').value,
-      cookie:$('#cookie').value,save_dir:$('#saveDir').value,ocr_scale:parseInt($('#ocrScale').value)||1});
+      cookie:$('#cookie').value,front_cookie:$('#frontCookie').value,
+      save_dir:$('#saveDir').value,ocr_scale:parseInt($('#ocrScale').value)||1,
+      fetch_resume_detail:$('#withDetail')&&$('#withDetail').checked?1:0,
+      resume_detail_limit:parseInt($('#detailLimit')&&$('#detailLimit').value)||0});
     flash($('#connMsg'),'已保存','ok');
   }
   async function testCookie(){
@@ -408,6 +453,7 @@ const App=(()=>{
   function flash(el,t,cls){el.textContent=t;el.className='msg '+cls;}
 
   return {init,fetchOne,fetchAll,loadData,page,renderTable,saveConfig,testCookie,
+          testFrontCookie,enrichResume,
           exportConfig,refreshCaptcha,doLogin,pickDir,doExport,openPath,
           toggleSelAll,selectNone,selectInvert,selectReady,renderExportCats};
 })();

@@ -30,6 +30,8 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 
+import resume_front as RF
+
 sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
 sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
 
@@ -319,7 +321,10 @@ UNAVAILABLE = {'账户订单管理': '接口不可用（与订单管理相同数
 # ----------------------------------------------------------------------
 CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
-                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 6}
+                  'front_cookie': '',
+                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 8,
+                  'fetch_resume_detail': 1,        # 简历库是否补抓前台简历详情
+                  'resume_detail_limit': 0}        # 0 = 不限条数
 
 
 def load_config():
@@ -566,7 +571,7 @@ def _set_progress(cat, **kw):
         p.update(kw)
 
 
-def fetch_category(cat, max_pages=0, use_ocr=True):
+def fetch_category(cat, max_pages=0, use_ocr=True, with_detail=True):
     """后台抓取一个类目（含 OCR），写入 DATA 与磁盘缓存"""
     if cat not in PARAMS_ORDER:
         _set_progress(cat, phase='error', msg='未知类目')
@@ -702,10 +707,18 @@ def fetch_category(cat, max_pages=0, use_ocr=True):
                          'fetched_at': time.time(), 'total': len(rows)}
         save_cache(cat)
         _persist_ocr_cache()
+
+        detail_info = ''
+        if cat == '简历库' and with_detail:
+            detail_info = enrich_resume_details(cat)
+            with DATA_LOCK:
+                rows = DATA[cat]['rows']
+
         _set_progress(cat, phase='done', pages_done=pages_seen, rows=len(rows),
                       ocr_total=ocr_total,
                       msg=f'完成：{len(rows)} 条'
                           + (f'，OCR 识别 {ocr_total} 张电话图片' if ocr_total else '')
+                          + detail_info
                           + f'，用时 {int(time.time()-t0)} 秒')
         print(f'[抓取] {cat} 完成 {len(rows)} 行')
     except Exception as e:
@@ -719,7 +732,103 @@ def fetch_category(cat, max_pages=0, use_ocr=True):
         _set_progress(cat, phase='error', msg=f'{e}')
 
 
-def start_fetch(cat, max_pages=0, use_ocr=True):
+# ----------------------------------------------------------------------
+# 简历库：补抓「前台简历详情」全量字段
+#
+# 列表接口 /Post/GetPostJlList 只给列表级字段（电话还是图片，需 OCR）；
+# 完整简历内容（工作经历 1-10 / 教育经历 1-5 / 语言能力 1-5 / 获得证书 1-5 /
+# 职位类别 / 现居地 / 自我描述标签与详情 …）只能来自前台简历详情页
+#     http://www.hbtc.ccoo.cn/post/qiuzhi/{id}x.html
+# 该页**必须带前台登录 Cookie**（无 Cookie 会返回登录页）。
+# ----------------------------------------------------------------------
+DETAIL_COLS = list(RF.DETAIL_COLS)
+
+# 简历详情列中默认隐藏的次要列（Excel 中可手动取消隐藏）
+RESUME_DETAIL_HIDDEN = {'照片', '工作经历7', '工作经历8', '工作经历9', '工作经历10',
+                        '教育经历3', '教育经历4', '教育经历5',
+                        '语言能力2', '语言能力3', '语言能力4', '语言能力5',
+                        '获得证书3', '获得证书4', '获得证书5'}
+
+
+def enrich_resume_details(cat='简历库', workers=None, limit=None):
+    """给简历库补抓前台简历详情，结果作为新列追加到每行末尾。
+    返回一段用于展示的说明文本。"""
+    with DATA_LOCK:
+        d = DATA.get(cat)
+        if not d or not d.get('rows'):
+            return ''
+        cols = list(d['cols'])
+        rows = d['rows']
+        fetched_at = d.get('fetched_at') or time.time()
+
+    if 'id' not in cols:
+        return '（该类目无 id 字段，跳过简历详情）'
+
+    fck = CONFIG.get('front_cookie') or ''
+    if not RF.normalize_cookie(fck):
+        return '（未配置前台 Cookie，已跳过简历详情；配置后可获取完整简历内容）'
+
+    idx = cols.index('id')
+    jlids, seen = [], set()
+    for r in rows:
+        rid = r[idx] if idx < len(r) else ''
+        s = '' if rid in (None, '') else str(rid).strip()
+        if s and s not in seen:
+            seen.add(s)
+            jlids.append(s)
+
+    if limit is None:
+        try:
+            limit = int(CONFIG.get('resume_detail_limit') or 0)
+        except (TypeError, ValueError):
+            limit = 0
+    if limit and limit > 0:
+        jlids = jlids[:limit]
+
+    if not jlids:
+        return ''
+
+    workers = workers or max(1, min(16, int(CONFIG.get('fetch_workers') or 8)))
+    total = len(jlids)
+    print(f'[简历详情] 开始抓取 {total} 份（{workers} 线程）…')
+    _set_progress(cat, msg=f'正在抓取 {total} 份简历详情（前台页）…',
+                  detail_done=0, detail_total=total)
+
+    def onp(done, tot, ok, fail):
+        if done % 20 == 0 or done == tot:
+            _set_progress(cat, detail_done=done, detail_total=tot,
+                          msg=f'简历详情 {done}/{tot}（成功 {ok} / 失败 {fail}）…')
+
+    t0 = time.time()
+    got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp)
+    print(f'[简历详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
+          f'需登录 {stat["need_login"]}，用时 {int(time.time() - t0)}s')
+
+    add = [c for c in DETAIL_COLS if c not in cols]
+    if not add:
+        return f'；简历详情 {stat["ok"]} 份（无新增列）'
+
+    for r in rows:
+        rid = r[idx] if idx < len(r) else ''
+        s = '' if rid in (None, '') else str(rid).strip()
+        det = got.get(s) or {}
+        for c in add:
+            r.append(det.get(c, ''))
+    cols.extend(add)
+
+    with DATA_LOCK:
+        DATA[cat] = {'rows': rows, 'cols': cols, 'fetched_at': fetched_at,
+                     'total': len(rows), 'detail_at': time.time()}
+    save_cache(cat)
+
+    extra = ''
+    if stat.get('need_login'):
+        extra = f'（{stat["need_login"]} 份返回登录页，前台 Cookie 可能已失效）'
+    return (f'；简历详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}'
+            f'，新增 {len(add)} 列')
+
+
+def start_fetch(cat, max_pages=0, use_ocr=True, with_detail=True):
     with JOB_LOCK:
         if cat in FETCH_JOBS:
             return False, '该类目正在抓取中'
@@ -727,7 +836,7 @@ def start_fetch(cat, max_pages=0, use_ocr=True):
 
     def runner():
         try:
-            fetch_category(cat, max_pages, use_ocr)
+            fetch_category(cat, max_pages, use_ocr, with_detail)
         finally:
             with JOB_LOCK:
                 FETCH_JOBS.discard(cat)
@@ -752,6 +861,8 @@ def export_excel(cat, rows, cols, path):
     """write_only 模式写单个类目 xlsx：两行表头(英文/中文) + 隐藏列"""
     from openpyxl import Workbook
     hidden = set(HIDDEN_COLS.get(cat, []))
+    if cat == '简历库':
+        hidden |= RESUME_DETAIL_HIDDEN
     zh_map = ZH_LABELS.get(cat, {})
     wb = Workbook(write_only=True)
     ws = wb.create_sheet(cat)
@@ -902,7 +1013,7 @@ def api_config_set():
     global CONFIG
     d = request.get_json(force=True, silent=True) or {}
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'front_cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
         if 'ocr_scale' in d:
@@ -910,9 +1021,65 @@ def api_config_set():
                 CONFIG['ocr_scale'] = max(1, min(20, int(d['ocr_scale'])))
             except (TypeError, ValueError):
                 pass
+        if 'fetch_workers' in d:
+            try:
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
+            except (TypeError, ValueError):
+                pass
+        if 'fetch_resume_detail' in d:
+            CONFIG['fetch_resume_detail'] = 1 if d['fetch_resume_detail'] else 0
+        if 'resume_detail_limit' in d:
+            try:
+                CONFIG['resume_detail_limit'] = max(0, int(d['resume_detail_limit']))
+            except (TypeError, ValueError):
+                pass
         save_config(CONFIG)
         CONFIG = load_config()
     return jsonify({'ok': True})
+
+
+@app.route('/api/front_test', methods=['POST'])
+def api_front_test():
+    """测试「前台 Cookie」是否可用于抓取简历详情页"""
+    global CONFIG
+    d = request.get_json(force=True, silent=True) or {}
+    ck = d.get('front_cookie')
+    if ck is None:
+        ck = CONFIG.get('front_cookie', '')
+    ck = str(ck)
+    ok, msg, sample = RF.test_front_cookie(ck)
+    if ok and ck:
+        with CONFIG_LOCK:
+            CONFIG['front_cookie'] = ck
+            save_config(CONFIG)
+            CONFIG = load_config()
+    return jsonify({'ok': ok, 'msg': msg, 'sample': sample})
+
+
+@app.route('/api/enrich_resume', methods=['POST'])
+def api_enrich_resume():
+    """对已抓取的简历库单独补抓前台简历详情（不重新拉列表）"""
+    with JOB_LOCK:
+        if '简历库' in FETCH_JOBS:
+            return jsonify({'ok': False, 'msg': '简历库正在抓取中'})
+        FETCH_JOBS.add('简历库')
+
+    def runner():
+        try:
+            enrich_resume_details('简历库')
+            with DATA_LOCK:
+                n = len((DATA.get('简历库') or {}).get('rows') or [])
+            _set_progress('简历库', phase='done',
+                          msg=f'简历详情补抓完成，共 {n} 行')
+        except Exception as e:
+            traceback.print_exc()
+            _set_progress('简历库', phase='error', msg=f'简历详情抓取失败：{e}')
+        finally:
+            with JOB_LOCK:
+                FETCH_JOBS.discard('简历库')
+
+    threading.Thread(target=runner, daemon=True).start()
+    return jsonify({'ok': True, 'msg': '已开始补抓简历详情'})
 
 
 @app.route('/api/config/export', methods=['GET'])
@@ -1030,9 +1197,10 @@ def api_fetch():
     cat = d.get('cat')
     max_pages = int(d.get('max_pages') or 0)
     use_ocr = bool(d.get('use_ocr', True))
+    with_detail = bool(d.get('with_detail', True))
     if cat not in PARAMS_ORDER:
         return jsonify({'ok': False, 'msg': '未知类目'})
-    ok, msg = start_fetch(cat, max_pages, use_ocr)
+    ok, msg = start_fetch(cat, max_pages, use_ocr, with_detail)
     return jsonify({'ok': ok, 'msg': msg})
 
 

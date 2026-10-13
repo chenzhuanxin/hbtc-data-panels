@@ -58,7 +58,7 @@
 **方式一：exe（推荐）**
 
 到 [Release](https://github.com/chenzhuanxin/hbtc-data-panels/releases) 下载
-`ResumeCollector-v1.0.0-windows-x64.exe`，放到单独目录双击运行。
+`ResumeCollector-v1.1.0-windows-x64.exe`，放到单独目录双击运行。
 
 **方式二：源码**
 

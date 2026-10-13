@@ -12,21 +12,26 @@
 
 | 子项目 | 目录 | 端口 | 一句话说明 |
 |---|---|---|---|
-| 城市中国平台数据面板 | [`city-data-panel/`](city-data-panel/) | 8787 | 抓取招聘后台 **7 个类目**全量数据，自动 OCR 识别电话图片，按规范导出 Excel / ZIP |
+| 城市中国平台数据面板 | [`city-data-panel/`](city-data-panel/) | 8787 | 抓取招聘后台 **7 个类目**全量数据，自动 OCR 识别电话图片，并可补抓**简历全量字段**（91 → 116 列），按规范导出 Excel / ZIP |
 | 企业投递简历采集面板 | [`resume-panel/`](resume-panel/) | 8790 | 按企业名称链式采集 **企业 → 岗位 → 投递简历 → 完整简历内容**，导出单表多页 Excel |
 
 每个子项目目录下的 `index.html` 是**详细说明页**，`README.md` 是简要说明，`src/` 是完整源码。
+
+> **关于「完整简历内容」**：简历的完整正文（工作经历、教育经历、语言能力、获得证书）只存在于前台简历详情页
+> `http://www.hbtc.ccoo.cn/post/qiuzhi/{id}x.html`，该页**必须带前台站点登录 Cookie**，否则返回登录页。
+> 两个面板都把「后台 Cookie」与「前台 Cookie」分开配置，各管一段。
 
 ---
 
 ## 快速开始
 
 1. 打开 [Release 页面](https://github.com/chenzhuanxin/hbtc-data-panels/releases)，下载需要的 exe：
-   - `CityDataPanel-v1.0.0-windows-x64.exe` — 平台数据面板
-   - `ResumeCollector-v1.0.0-windows-x64.exe` — 企业投递简历采集面板
+   - `CityDataPanel-v1.1.0-windows-x64.exe` — 平台数据面板
+   - `ResumeCollector-v1.1.0-windows-x64.exe` — 企业投递简历采集面板
 2. 把 exe 放到**一个单独的文件夹**里，双击运行。
 3. 控制台会自动打开浏览器面板（8787 / 8790），关闭控制台窗口即停止服务。
 4. 在面板中填入后台账号密码或 Cookie，点「测试」验证后即可抓取、导出。
+   若要拿到**完整简历内容**，再粘贴一份前台站点（`www.hbtc.ccoo.cn`）的 Cookie 并点「测试前台 Cookie」。
 
 > exe 首次运行会在自身所在目录生成 `config.json` 与 `data_cache/`，所有配置与数据都保存在本地，不上传任何服务器。
 
@@ -37,14 +42,14 @@
 ```bash
 # 平台数据面板
 cd city-data-panel/src
-pip install flask requests rapidocr_onnxruntime openpyxl onnxruntime
-copy config.example.json config.json     # 填入账号/密码/Cookie
+pip install flask requests beautifulsoup4 lxml rapidocr_onnxruntime openpyxl onnxruntime
+copy config.example.json config.json     # 填入后台 Cookie / 前台 Cookie
 python -X utf8 面板.py
 
 # 企业投递简历采集面板
 cd resume-panel/src
 pip install flask requests beautifulsoup4 lxml openpyxl
-copy config.example.json config.json
+copy config.example.json config.json     # 填入后台 Cookie / 前台 Cookie
 python -X utf8 面板.py
 ```
 

@@ -129,12 +129,13 @@
     <h1>两款采集面板，一套 <span>招聘数据工作流</span></h1>
     <p>
       针对 <strong>城市中国 · 湖北通城网（hbtc.ccoo.cn）</strong> 招聘后台打造的两款本地面板工具：
-      一款把平台 7 大类目数据（含图片电话 OCR）整表导出 Excel，一款顺着「企业 → 岗位 → 投递简历 → 完整简历」把投递明细一网打尽。
+      一款把平台 7 大类目数据（含图片电话 OCR 与完整简历字段）整表导出 Excel，一款顺着「企业 → 岗位 → 投递简历 → 完整简历」把投递明细一网打尽。
       均为 Python + Flask 本地服务 + 浏览器界面，打包为 Windows 单文件 exe，双击即用。
     </p>
     <div class="hero-meta">
       <span class="chip">Windows 单文件 exe</span>
       <span class="chip">本地运行 · 数据不上传</span>
+      <span class="chip">简历全量字段</span>
       <span class="chip">Excel / ZIP 导出</span>
       <span class="chip">离线 OCR</span>
       <span class="chip">并发抓取</span>
@@ -159,10 +160,11 @@
           </div>
         </div>
         <div class="card-body">
-          <p>一键抓取招聘后台 <strong>7 个类目</strong>的全量数据，自动识别电话图片并转文字，按参考格式导出 Excel。</p>
+          <p>一键抓取招聘后台 <strong>7 个类目</strong>的全量数据，自动识别电话图片并转文字，简历库还能补抓<strong>完整简历字段</strong>，按参考格式导出 Excel。</p>
           <ul class="feat">
             <li>7 类目全覆盖：订单管理 / 全职岗位 / 兼职岗位 / 企业库 / 会员企业 / 简历库 / 注册用户</li>
             <li>base64 图片电话自动 OCR（RapidOCR 离线识别，无需联网）</li>
+            <li><b>简历全量字段补抓</b>：前台简历页逐份解析，工作/教育经历、语言能力、获得证书入表（91 → 116 列）</li>
             <li>类目勾选导出：单类目 = 一个 xlsx，多类目 = 自动打 zip 包</li>
             <li>保留全部字段，次要列自动隐藏；非法字符自动清洗</li>
             <li>并发分页抓取，7 类目共 9.8 万条也能快速拉完</li>
@@ -170,7 +172,7 @@
         </div>
         <div class="card-foot">
           <a class="btn primary" href="city-data-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.0.0/CityDataPanel-v1.0.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.1.0/CityDataPanel-v1.1.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -188,14 +190,14 @@
           <ul class="feat">
             <li>企业名称模糊搜索，选企业后可单独查该企业的岗位列表</li>
             <li>岗位投递明细：投递人、时间、联系方式（明文电话/邮箱/QQ）</li>
-            <li>简历内容深度解析：基本信息、期望职位薪资、自我描述、工作/教育经历、语言与证书</li>
+            <li><b>简历全量解析</b>：前台简历页逐份抓取，基本信息、期望职位薪资、自我描述、工作/教育经历、语言与证书</li>
             <li>导出可勾选：仅岗位列表 / 仅投递简历 / 两者都要</li>
-            <li>并发抓取 6 线程，500+ 份简历详情约 1 分钟抓完</li>
+            <li>并发抓取 8 线程，数百份简历详情 1 分钟内抓完</li>
           </ul>
         </div>
         <div class="card-foot">
           <a class="btn teal" href="resume-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.0.0/ResumeCollector-v1.0.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.1.0/ResumeCollector-v1.1.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -218,7 +220,7 @@
           <tr><td>兼职岗位</td><td class="num">23</td><td>兼职招聘岗位</td></tr>
           <tr><td>企业库</td><td class="num">4,735</td><td>平台企业主体名录</td></tr>
           <tr><td>会员企业</td><td class="num">198</td><td>付费会员企业</td></tr>
-          <tr><td>简历库</td><td class="num">15,733</td><td>求职简历，电话字段为图片</td></tr>
+          <tr><td>简历库</td><td class="num">15,733</td><td>求职简历，电话字段为图片；补抓详情后 91 → <b>116 列</b></td></tr>
           <tr><td>注册用户</td><td class="num">73,046</td><td>站点注册用户，手机号字段为图片</td></tr>
           <tr><td style="font-weight:700">合计</td><td class="num">98,657</td><td>—</td></tr>
         </tbody>
@@ -244,14 +246,18 @@
       </div>
       <div class="step">
         <div class="n">3</div>
-        <h4>填写账号 / Cookie</h4>
-        <p>在面板里填入后台账号密码，或直接粘贴登录后的 Cookie，点「测试」验证有效性。</p>
+        <h4>填账号 / 两种 Cookie</h4>
+        <p>填入后台账号密码或后台 Cookie（管类目与投递列表）。若要<b>完整简历内容</b>，再粘贴前台站点 <code>www.hbtc.ccoo.cn</code> 的 Cookie，各自点「测试」验证。</p>
       </div>
       <div class="step">
         <div class="n">4</div>
         <h4>抓取并导出</h4>
-        <p>选择类目 / 企业后开始抓取，完成后勾选需要的类目导出到指定目录。</p>
+        <p>选择类目 / 企业后开始抓取，完成后勾选需要的类目或工作表导出到指定目录。</p>
       </div>
+    </div>
+    <div class="note" style="background:#fff8e9;border:1px solid #f6e0b0;border-left:4px solid #F5A623;border-radius:12px;padding:16px 20px;font-size:14px;color:#6b5320;margin-top:30px">
+      <b>为什么需要前台 Cookie？</b>简历的完整正文（工作经历、教育经历、语言能力、获得证书）只存在于前台简历详情页
+      <code>/post/qiuzhi/{id}x.html</code>，该页不带前台登录 Cookie 会返回登录页。两种 Cookie 分开配置、各管一段。
     </div>
   </div>
 </section>
