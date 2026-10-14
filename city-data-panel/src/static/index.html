@@ -115,7 +115,7 @@ tbody tr:nth-child(even){background:#fafbfe}
       <label class="f">导入配置(JSON)<input type="file" id="importFile" accept=".json" style="font-size:12px"></label>
       <label class="f">OCR放大倍数<input type="text" id="ocrScale" style="width:60px" value="1" title="RapidOCR 建议 1（实测 1 倍最准）"></label>
       <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
-      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="1" title="任意两次前台简历请求之间的最小间隔（秒）。1 ≈ 1 请求/秒；调小会更快但可能被站点安全策略拦截"></label>
+      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="2" title="岗位与简历前台详情统一使用的请求间隔（秒）。2 ≈ 0.5 请求/秒，更安全；前台站点对高频访问极敏感（IP 频繁访问即 403 拉黑），调小会更快但更容易被封 IP。若被拦，请调大到 3-5 并等待十几分钟冷却"></label>
       <span id="connMsg" class="msg"></span>
     </div>
   </div>
@@ -134,6 +134,16 @@ tbody tr:nth-child(even){background:#fafbfe}
                 title="对所有简历重新抓一遍前台详情（列已存在时按缺失单元格回填）">补抓简历库详情（全量）</button>
         <button class="ghost" onclick="App.enrichResume(true)"
                 title="只补那些还没有详情的简历——被站点限速中断后用这个续抓，不必重跑已有部分">只补缺失详情</button>
+        <span class="kv">
+          <select id="jobCat" style="width:auto">
+            <option value="全职岗位">全职岗位</option>
+            <option value="兼职岗位">兼职岗位</option>
+          </select>
+          <button class="ghost" onclick="App.enrichJob(false)"
+                  title="对所选岗位类目补抓前台岗位详情（全量字段：职位类别/学历要求/招聘人数/工作经验/公司地址/更新时间/剩余有效期/关注度/职位描述/公司介绍/公司行业/规模/性质等）">补抓岗位详情（全量）</button>
+          <button class="ghost" onclick="App.enrichJob(true)"
+                  title="只补所选岗位类目中还没有详情的岗位——被站点限速中断后用这个续抓，不必重跑已有部分">只补缺失岗位详情</button>
+        </span>
         <button class="ghost" onclick="App.fetchAll()">一键抓取全部类目</button>
       </div>
     </div>
@@ -363,6 +373,15 @@ const App=(()=>{
     flash($('#frontMsg'),tip,'warn');
     await jpost('/api/enrich_resume',{only_missing:!!onlyMissing});
   }
+  async function enrichJob(onlyMissing){
+    await saveConfig();
+    const cat=($('#jobCat')?$('#jobCat').value:'全职岗位');
+    const tip = onlyMissing
+      ? `已开始【只补缺失岗位详情】(${cat})，将跳过已有详情、只抓空缺的那些…`
+      : `已开始【全量补抓岗位详情】(${cat})，请看抓取进度…`;
+    flash($('#frontMsg'),tip,'warn');
+    await jpost('/api/enrich_job',{cat,only_missing:!!onlyMissing});
+  }
 
   let pollTimer=null;
   async function pollProgress(){
@@ -468,7 +487,7 @@ const App=(()=>{
   function flash(el,t,cls){el.textContent=t;el.className='msg '+cls;}
 
   return {init,fetchOne,fetchAll,loadData,page,renderTable,saveConfig,testCookie,
-          testFrontCookie,enrichResume,
+          testFrontCookie,enrichResume,enrichJob,
           exportConfig,refreshCaptcha,doLogin,pickDir,doExport,openPath,
           toggleSelAll,selectNone,selectInvert,selectReady,renderExportCats};
 })();

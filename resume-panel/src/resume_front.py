@@ -55,6 +55,16 @@ DETAIL_COLS = (BASE_DETAIL_COLS
                + [f'语言能力{i}' for i in range(1, LANG_COLS + 1)]
                + [f'获得证书{i}' for i in range(1, CERT_COLS + 1)])
 
+# ----------------------------------------------------------------------
+# 岗位前台详情字段（参照简历：从 /post/zhaopin/{id}x.html 补抓全量字段）
+# 前台岗位详情页相对后台列表接口补充/文本化的完整字段。
+# ----------------------------------------------------------------------
+JOB_DETAIL_COLS = ['岗位标题', '薪资', '职位类别', '学历要求', '招聘人数',
+                   '工作经验', '公司地址', '更新时间', '剩余有效期', '信息关注度',
+                   '职位描述', '公司介绍', '公司名称', '公司行业', '公司规模',
+                   '公司性质']
+JOB_DETAIL_HIDDEN = {'公司介绍', '剩余有效期', '信息关注度', '公司规模'}
+
 # 默认头像占位图（识别后不作为有效头像）
 _AVATAR_PLACEHOLDERS = ('offer-list-autor', 'nophoto', 'default', 'noavatar', 'noimg',
                         '/images/blank', 'touxiang_moren')
@@ -64,6 +74,10 @@ _LOGIN_PAGE_MARK = 'search_nologin'
 
 def resume_url(jlid):
     return f'{FRONT_BASE}/post/qiuzhi/{jlid}x.html'
+
+
+def job_url(jobid):
+    return f'{FRONT_BASE}/post/zhaopin/{jobid}x.html'
 
 
 def normalize_cookie(s):
@@ -300,10 +314,11 @@ _WAF_MARKS = ('网络安全验证', '疑似异常访问请求', 'IP频繁访问'
               '访问操作提示', '系统拦截')
 
 # 全局限速：任意两次前台请求之间至少间隔这么多秒。
-# 默认 1.0 ≈ 1 请求/秒 —— 与用户原始脚本 time.sleep(1) 的速率一致（实测安全）。
-MIN_INTERVAL = 1.0
+# 默认 2.0 ≈ 0.5 请求/秒 —— 前台 WAF 对高频访问极敏感（IP 频繁访问即 403 拉黑），
+# 岗位与简历详情都从前台抓取，因此统一采用保守速率，降低被拦截概率。
+MIN_INTERVAL = 2.0
 # 同时的在途请求数上限（并发连接数）。1 = 完全串行，最安全。
-MAX_INFLIGHT = 2
+MAX_INFLIGHT = 1
 _RATE_LOCK = threading.Lock()
 _inflight = threading.Semaphore(2)
 _rate_state = {'next_at': 0.0}
@@ -486,6 +501,103 @@ def parse_front_resume(html, jlid=''):
 
 
 # ----------------------------------------------------------------------
+# 岗位前台详情解析（/post/zhaopin/{id}x.html）
+# ----------------------------------------------------------------------
+def _job_basic(ib, keyword):
+    """在岗位基本信息 infoBox 内按 <span class=name>标签</span><span class=info>值</span> 取值"""
+    for li in ib.find_all('li', class_=lambda c: c and 'item' in c):
+        for lab in li.find_all('span', class_='name'):
+            if keyword in _safe_text(lab):
+                v = lab.find_next_sibling('span')
+                return clean_rich(v) if v is not None else ''
+    return ''
+
+
+def parse_front_job(html, jobid=''):
+    """解析前台岗位详情页，返回岗位全量字段 dict（页面无效返回 None）"""
+    soup = BeautifulSoup(html, 'html.parser')
+    if not soup.find(class_='zMain-titBox'):
+        return None
+    d = {c: '' for c in JOB_DETAIL_COLS}
+    d['岗位ID'] = jobid
+
+    # ---------- 标题 ----------
+    tt = soup.find(class_='zMain-titBox')
+    d['岗位标题'] = _safe_text(tt)
+
+    # ---------- 薪资（主岗位 p.price 或 span.tab.price） ----------
+    sal = soup.find('p', class_='price')
+    if sal is None:
+        sal = soup.find('span', class_=lambda c: c and 'price' in c and 'tab' in c)
+    d['薪资'] = _safe_text(sal)
+
+    # ---------- 基本信息（主岗位 infoBox：含 招聘职位/学历要求） ----------
+    main_ib = None
+    for ib in soup.find_all(class_=lambda c: c and 'infoBox' in c):
+        if '招聘职位' in _safe_text(ib) or '学历要求' in _safe_text(ib):
+            main_ib = ib
+            break
+    if main_ib is not None:
+        d['职位类别'] = _job_basic(main_ib, '招聘职位')
+        d['学历要求'] = _job_basic(main_ib, '学历要求')
+        d['招聘人数'] = _job_basic(main_ib, '招聘人数')
+        d['工作经验'] = _job_basic(main_ib, '工作经验')
+        d['公司地址'] = _job_basic(main_ib, '公司地址')
+
+    # ---------- 更新时间 / 剩余有效期 / 信息关注度 ----------
+    top = soup.find('div', class_='zMainBox')
+    if top is not None:
+        t = _safe_text(top)
+        m = re.search(r'更新时间[：:]\s*([0-9]{2,4}[-/年].*?)(?=\s|剩余|信息|举报)', t)
+        if m:
+            d['更新时间'] = m.group(1).strip()
+        m = re.search(r'剩余有效期[：:]\s*([\d\s.]+?)\s*天', t)
+        if m:
+            d['剩余有效期'] = m.group(1).strip() + '天'
+        m = re.search(r'信息关注度[：:]\s*([\d,]+)\s*人次', t)
+        if m:
+            d['信息关注度'] = m.group(1).strip() + '人次'
+
+    # ---------- 职位描述 / 公司介绍（zCon 区块，按标题定位） ----------
+    for z in soup.find_all('div', class_='zCon'):
+        t = _safe_text(z)
+        if t.startswith('职位描述'):
+            d['职位描述'] = t[len('职位描述'):].strip()
+        elif t.startswith('公司介绍'):
+            d['公司介绍'] = t[len('公司介绍'):].strip()
+
+    # ---------- 公司信息（zComBox：<p class=name> 名称 + ul.items 行业/规模/性质） ----------
+    for cb in soup.find_all('div', class_=lambda c: c and 'zComBox' in c):
+        name_el = cb.find('p', class_='name')
+        if name_el is None:
+            continue
+        d['公司名称'] = _safe_text(name_el)
+        for item in cb.find_all('li', class_='item'):
+            span = item.find('span')
+            if span is None:
+                continue
+            st = _safe_text(span)
+            for key, col in (('公司行业', '公司行业'), ('公司规模', '公司规模'),
+                             ('公司性质', '公司性质')):
+                if st.startswith(key):
+                    val = st[len(key):].lstrip('：:').strip()
+                    if val:
+                        d[col] = val
+        break
+
+    return d
+
+
+def is_job_login_page(html):
+    """岗位详情页有效判断：无岗位标题区即视为登录页/无内容"""
+    if not html:
+        return True
+    if is_waf_block(html):
+        return False
+    return 'zMain-titBox' not in html and 'zMainBox' not in html
+
+
+# ----------------------------------------------------------------------
 # 抓取
 # ----------------------------------------------------------------------
 _TLS = threading.local()
@@ -502,9 +614,15 @@ def _session(cookie_str=None):
     return s
 
 
-def fetch_one(jlid, cookie_str, timeout=25, retries=3, session=None):
-    """抓取并解析单份简历。成功返回 dict，失败返回 {'_error': ...}。"""
-    url = resume_url(jlid)
+def fetch_one(jlid, cookie_str, timeout=25, retries=3, session=None, kind='resume'):
+    """抓取并解析单个对象。
+
+    kind='resume' 抓简历详情页 /post/qiuzhi/{id}x.html；
+    kind='job'    抓岗位详情页 /post/zhaopin/{id}x.html。
+    成功返回 dict，失败返回 {'_error': ...}。
+    """
+    url = job_url(jlid) if kind == 'job' else resume_url(jlid)
+    idkey = '岗位ID' if kind == 'job' else '简历ID'
     last = None
     for attempt in range(max(1, retries)):
         try:
@@ -515,31 +633,42 @@ def fetch_one(jlid, cookie_str, timeout=25, retries=3, session=None):
             r.encoding = 'utf-8'
             if is_waf_block(r.text, r.status_code):
                 # 被 WAF 拦截：立刻返回，不做任何等待或重试。
-                # 等待/重试只会继续加压、把 IP 打进更长的黑名单；
-                # 由 fetch_many 的熔断计数在几秒内终止整批任务。
-                return {'_error': 'waf_block', '简历ID': jlid}
+                return {'_error': 'waf_block', idkey: jlid}
             if r.status_code != 200:
                 last = f'HTTP {r.status_code}'
                 time.sleep(0.5 * (attempt + 1))
                 continue
-            if is_login_page(r.text):
-                return {'_error': 'need_login', '简历ID': jlid}
-            d = parse_front_resume(r.text, jlid)
+            if kind == 'job':
+                if is_job_login_page(r.text):
+                    return {'_error': 'need_login', idkey: jlid}
+                d = parse_front_job(r.text, jlid)
+            else:
+                if is_login_page(r.text):
+                    return {'_error': 'need_login', idkey: jlid}
+                d = parse_front_resume(r.text, jlid)
             if d is None:
-                last = '页面无简历内容'
+                last = '页面无内容'
                 time.sleep(0.5 * (attempt + 1))
                 continue
-            d['简历链接'] = url
+            if kind == 'job':
+                d['岗位链接'] = url
+            else:
+                d['简历链接'] = url
             return d
         except Exception as e:
             last = f'{type(e).__name__}: {e}'
             time.sleep(0.5 * (attempt + 1))
-    return {'_error': str(last or 'unknown'), '简历ID': jlid}
+    return {'_error': str(last or 'unknown'), idkey: jlid}
+
+
+def fetch_one_job(jobid, cookie_str, **kw):
+    """抓取并解析单个岗位详情页。"""
+    return fetch_one(jobid, cookie_str, kind='job', **kw)
 
 
 def _fetch_round(jlids, cookie_str, workers, timeout, retries, should_stop=None,
                  on_progress=None, offset=0, grand_total=None, ok0=0, fail0=0,
-                 stats=None, out=None, lock=None):
+                 stats=None, out=None, lock=None, kind='resume'):
     """跑一轮并发抓取；成功的写入 out，失败的收集后返回，供下一轮重试。"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -553,7 +682,7 @@ def _fetch_round(jlids, cookie_str, workers, timeout, retries, should_stop=None,
         one.trust_env = False
         one.cookies = requests.cookies.cookiejar_from_dict(normalize_cookie(cookie_str))
         return jid, fetch_one(jid, cookie_str, timeout=timeout,
-                              retries=retries, session=one)
+                              retries=retries, session=one, kind=kind)
 
     failed = []
     stopped = [False]
@@ -590,11 +719,12 @@ def _fetch_round(jlids, cookie_str, workers, timeout, retries, should_stop=None,
 
 def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
                timeout=25, retries=3, min_interval=None, max_inflight=None,
-               waf_stop_after=3, retry_rounds=2, retry_delay=8.0):
+               waf_stop_after=3, retry_rounds=2, retry_delay=8.0, kind='resume'):
     """
-    并发抓取多份简历（全量）。返回 (out, stats)
+    并发抓取多份简历/岗位（全量）。返回 (out, stats)
 
-      out    : {jlid: detail_dict}    只含成功的
+      kind='resume' 抓简历详情页；kind='job' 抓岗位详情页。
+      out    : {id: detail_dict}    只含成功的
       stats  : {'done','ok','fail','need_login','waf_block','total','stopped',
                 'rounds'}
 
@@ -603,7 +733,7 @@ def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
 
     可靠抓取策略（保证"全量"）：
       1) 全局限速：无论 workers 多大，实际速率被 MIN_INTERVAL 卡住
-         （默认 1 请求/秒），在途连接由 MAX_INFLIGHT 限制。
+         （默认 0.5 请求/秒），在途连接由 MAX_INFLIGHT 限制（默认 1，串行）。
       2) 失败自动补抓：第一轮结束后，对失败的 id 再跑 `retry_rounds` 轮，
          轮间等待 `retry_delay` 秒（给站点缓冲）。
       3) WAF 熔断：一旦命中拦截页达到 waf_stop_after 次，立即停止本批，
@@ -648,7 +778,7 @@ def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
         _fetch_round(pending, cookie_str, workers, timeout, retries,
                      should_stop=should_stop, on_progress=on_progress,
                      offset=offset, grand_total=total, ok0=before_waf,
-                     stats=stats_all, out=out, lock=lock)
+                     stats=stats_all, out=out, lock=lock, kind=kind)
 
         ok_total = len(out)
         # 待补 = 仍未成功的
@@ -669,6 +799,11 @@ def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
                  'need_login': stats_all['need_login'],
                  'waf_block': stats_all['waf_block'],
                  'total': total, 'stopped': stopped, 'rounds': rounds}
+
+
+def fetch_many_job(jobids, cookie_str, **kw):
+    """并发抓取多份岗位详情页（全量），复用 fetch_many 的限速/熔断/补抓机制。"""
+    return fetch_many(jobids, cookie_str, kind='job', **kw)
 
 
 def test_front_cookie(cookie_str, probe_jlid='1906236'):

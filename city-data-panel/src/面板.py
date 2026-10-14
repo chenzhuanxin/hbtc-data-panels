@@ -714,6 +714,10 @@ def fetch_category(cat, max_pages=0, use_ocr=True, with_detail=True):
             detail_info = enrich_resume_details(cat)
             with DATA_LOCK:
                 rows = DATA[cat]['rows']
+        elif cat in ('全职岗位', '兼职岗位') and with_detail:
+            detail_info = enrich_job_details(cat)
+            with DATA_LOCK:
+                rows = DATA[cat]['rows']
 
         _set_progress(cat, phase='done', pages_done=pages_seen, rows=len(rows),
                       ocr_total=ocr_total,
@@ -749,6 +753,10 @@ RESUME_DETAIL_HIDDEN = {'照片', '工作经历7', '工作经历8', '工作经�
                         '教育经历3', '教育经历4', '教育经历5',
                         '语言能力2', '语言能力3', '语言能力4', '语言能力5',
                         '获得证书3', '获得证书4', '获得证书5'}
+
+# 岗位前台详情列（参照简历：从 /post/zhaopin/{id}x.html 补抓全量字段）
+JOB_DETAIL_COLS = list(RF.JOB_DETAIL_COLS)
+JOB_DETAIL_HIDDEN = set(RF.JOB_DETAIL_HIDDEN)
 
 
 def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missing=False):
@@ -807,7 +815,7 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missin
 
     workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
     try:
-        rate = float(CONFIG.get('front_rate') or 1.0)
+        rate = float(CONFIG.get('front_rate') or 2.0)
     except (TypeError, ValueError):
         rate = 1.0
     total = len(jlids)
@@ -882,16 +890,170 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missin
             f'，新增 {len(add)} 列')
 
 
+# ----------------------------------------------------------------------
+# 岗位：补抓「前台岗位详情」全量字段（参照简历的做法）
+#
+# 后台列表接口 GetYZJobList / GetJZ_YZJobList 只给列表级字段；
+# 岗位完整内容（职位类别/学历要求/招聘人数/工作经验/公司地址/更新时间/
+# 剩余有效期/信息关注度/职位描述/公司介绍/公司行业/规模/性质 …）
+# 来自前台岗位详情页 http://www.hbtc.ccoo.cn/post/zhaopin/{id}x.html
+# ----------------------------------------------------------------------
+def enrich_job_details(cat='全职岗位', workers=None, limit=None, only_missing=False):
+    """给岗位类目（全职岗位/兼职岗位）补抓前台岗位详情，结果作为新列追加到每行末尾。
+
+    only_missing=True 时**跳过已经有详情的行**，只补那些还空着的
+    （用于被 WAF 熔断中断后，稍后续抓剩下的部分，不必重跑全部）。
+
+    返回一段用于展示的说明文本。
+    """
+    with DATA_LOCK:
+        d = DATA.get(cat)
+        if not d or not d.get('rows'):
+            return ''
+        cols = list(d['cols'])
+        rows = d['rows']
+        fetched_at = d.get('fetched_at') or time.time()
+
+    if 'id' not in cols:
+        return '（该类目无 id 字段，跳过岗位详情）'
+
+    fck = CONFIG.get('front_cookie') or ''
+    if not RF.normalize_cookie(fck):
+        return '（未配置前台 Cookie，已跳过岗位详情；配置后可获取完整岗位内容）'
+
+    idx = cols.index('id')
+    # 判断"是否已有详情"的锚点列：岗位标题（前台详情 100% 有值）
+    anchor = '岗位标题'
+    has_anchor = anchor in cols
+    name_idx = cols.index(anchor) if has_anchor else None
+
+    # 起始覆盖率：以「岗位标题」为锚点，统计已带详情的行数（含未去重前）
+    already = 0
+    if name_idx is not None:
+        already = sum(1 for r in rows
+                      if name_idx < len(r) and str(r[name_idx] or '').strip())
+
+    jobids, seen, skipped = [], set(), 0
+    for r in rows:
+        rid = r[idx] if idx < len(r) else ''
+        s = '' if rid in (None, '') else str(rid).strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        if only_missing and name_idx is not None:
+            has = name_idx < len(r) and str(r[name_idx] or '').strip()
+            if has:
+                skipped += 1
+                continue
+        jobids.append(s)
+
+    if limit is None:
+        try:
+            limit = int(CONFIG.get('resume_detail_limit') or 0)
+        except (TypeError, ValueError):
+            limit = 0
+    if limit and limit > 0:
+        jobids = jobids[:limit]
+
+    if not jobids:
+        if only_missing and skipped:
+            return f'（全部 {skipped} 个岗位都已有详情，无需补抓）'
+        return ''
+
+    workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
+    try:
+        rate = float(CONFIG.get('front_rate') or 2.0)
+    except (TypeError, ValueError):
+        rate = 1.0
+    total = len(jobids)
+    n_rows = len(rows)
+    base = already if only_missing else 0
+    est = total * max(rate, 0.05)
+    print(f'[岗位详情] 开始抓取 {total} 个（跳过已有 {skipped} 个；'
+          f'{workers} 线程，间隔 {rate}s ≈ {1.0 / max(rate, 0.01):.1f} 请求/秒，'
+          f'预计 {int(est // 60)} 分 {int(est % 60)} 秒）…')
+    _set_progress(cat, msg=f'正在抓取 {total} 个岗位详情（前台页）…'
+                           f'当前详情覆盖 {base}/{n_rows}',
+                  detail_done=base, detail_total=n_rows)
+
+    def onp(done, tot, ok, fail):
+        if done % 10 == 0 or done == tot:
+            _set_progress(cat, detail_done=min(n_rows, base + done),
+                          detail_total=n_rows,
+                          msg=f'岗位详情 {done}/{tot}（成功 {ok} / 失败 {fail}），'
+                              f'当前详情覆盖 {min(n_rows, base + done)}/{n_rows}')
+
+    t0 = time.time()
+    got, stat = RF.fetch_many_job(jobids, fck, workers=workers, on_progress=onp,
+                                  min_interval=rate, max_inflight=1,
+                                  waf_stop_after=3, retry_rounds=2, retry_delay=8.0)
+    el = max(0.1, time.time() - t0)
+    print(f'[岗位详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
+          f'需登录 {stat["need_login"]} 被拦截 {stat["waf_block"]}，'
+          f'{stat["rounds"]} 轮，用时 {int(el)}s（{stat["done"] / el:.2f} 请求/秒）')
+
+    add = [c for c in JOB_DETAIL_COLS if c not in cols]
+    if not add:
+        # 列已存在：按 id 回填缺失单元格
+        for r in rows:
+            rid = r[idx] if idx < len(r) else ''
+            s = '' if rid in (None, '') else str(rid).strip()
+            det = got.get(s) or {}
+            for c in JOB_DETAIL_COLS:
+                if c not in cols:
+                    continue
+                ci = cols.index(c)
+                if ci >= len(r):
+                    continue
+                if not str(r[ci] or '').strip() and det.get(c):
+                    r[ci] = det[c]
+    else:
+        for r in rows:
+            rid = r[idx] if idx < len(r) else ''
+            s = '' if rid in (None, '') else str(rid).strip()
+            det = got.get(s) or {}
+            for c in add:
+                r.append(det.get(c, ''))
+        cols.extend(add)
+
+    with DATA_LOCK:
+        DATA[cat] = {'rows': rows, 'cols': cols, 'fetched_at': fetched_at,
+                     'total': len(rows), 'detail_at': time.time()}
+    save_cache(cat)
+
+    # 统计最终详情覆盖率（以「岗位标题」为锚点）
+    filled = 0
+    if anchor in cols:
+        ci = cols.index(anchor)
+        filled = sum(1 for r in rows if ci < len(r) and str(r[ci] or '').strip())
+    cover = f'，详情覆盖 {filled}/{len(rows)}'
+
+    extra = ''
+    if stat.get('waf_block'):
+        extra = (f'（{stat["waf_block"]} 个被站点安全策略拦截，已自动熔断；'
+                 f'请等十几分钟（期间不要继续请求）后点「只补缺失岗位详情」续抓，'
+                 f'或把「前台请求间隔」调大）')
+    elif stat.get('need_login'):
+        extra = f'（{stat["need_login"]} 个返回登录页，前台 Cookie 可能已失效）'
+    if stat.get('stopped') and not stat.get('waf_block'):
+        extra += '（已提前停止）'
+    if skipped:
+        extra += f'（跳过已有详情 {skipped} 个）'
+    return (f'；岗位详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}{cover}'
+            f'，新增 {len(add)} 列')
+
+
 def detail_coverage(cat='简历库'):
-    """返回 (已有详情数, 总行数)，用于界面提示"""
+    """返回 (已有详情数, 总行数)，用于界面提示。简历锚点=姓名；岗位锚点=岗位标题"""
+    anchor = '岗位标题' if cat in ('全职岗位', '兼职岗位') else '姓名'
     with DATA_LOCK:
         d = DATA.get(cat)
         if not d or not d.get('rows'):
             return 0, 0
         cols, rows = d['cols'], d['rows']
-        if '姓名' not in cols:
+        if anchor not in cols:
             return 0, len(rows)
-        ci = cols.index('姓名')
+        ci = cols.index(anchor)
         return sum(1 for r in rows if ci < len(r) and str(r[ci] or '').strip()), len(rows)
 
 
@@ -930,6 +1092,8 @@ def export_excel(cat, rows, cols, path):
     hidden = set(HIDDEN_COLS.get(cat, []))
     if cat == '简历库':
         hidden |= RESUME_DETAIL_HIDDEN
+    elif cat in ('全职岗位', '兼职岗位'):
+        hidden |= JOB_DETAIL_HIDDEN
     zh_map = ZH_LABELS.get(cat, {})
     wb = Workbook(write_only=True)
     ws = wb.create_sheet(cat)
@@ -1156,6 +1320,39 @@ def api_enrich_resume():
 
     threading.Thread(target=runner, daemon=True).start()
     return jsonify({'ok': True, 'msg': '已开始补抓简历详情'})
+
+
+@app.route('/api/enrich_job', methods=['POST'])
+def api_enrich_job():
+    """对已抓取的岗位类目（全职岗位/兼职岗位）单独补抓前台岗位详情（不重新拉列表）
+
+    body 可选：{"cat": "全职岗位", "only_missing": true} —— only_missing 只补没有详情的（断点续抓）
+    """
+    d = request.get_json(force=True, silent=True) or {}
+    cat = str(d.get('cat') or '全职岗位')
+    only_missing = bool(d.get('only_missing'))
+    if cat not in ('全职岗位', '兼职岗位'):
+        return jsonify({'ok': False, 'msg': '仅支持全职岗位/兼职岗位类目'})
+    with JOB_LOCK:
+        if cat in FETCH_JOBS:
+            return jsonify({'ok': False, 'msg': f'{cat} 正在抓取中'})
+        FETCH_JOBS.add(cat)
+
+    def runner():
+        try:
+            info = enrich_job_details(cat, only_missing=only_missing)
+            filled, tot = detail_coverage(cat)
+            _set_progress(cat, phase='done',
+                          msg=f'岗位详情补抓完成{info}（详情覆盖 {filled}/{tot}）')
+        except Exception as e:
+            traceback.print_exc()
+            _set_progress(cat, phase='error', msg=f'岗位详情抓取失败：{e}')
+        finally:
+            with JOB_LOCK:
+                FETCH_JOBS.discard(cat)
+
+    threading.Thread(target=runner, daemon=True).start()
+    return jsonify({'ok': True, 'msg': '已开始补抓岗位详情'})
 
 
 @app.route('/api/config/export', methods=['GET'])
