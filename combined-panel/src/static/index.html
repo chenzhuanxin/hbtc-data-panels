@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>城市中国·湖北通城网 综合数据面板</title>
+<meta name="description" content="城市中国·湖北通城网招聘频道综合数据面板：平台 7 类数据抓取 + 企业投递简历采集，一个面板全搞定。">
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --text:#1a2233; --muted:#5b6b85;
+    --border:#e4e9f2; --line:#eef2f8;
+    --a1:#5B8CFF; --a2:#2A46C8; --accent:#3B6BF0;
+    --b1:#25C2A8; --b2:#0E6E9E; --teal:#0F9C8A;
+    --gold:#F5A623; --ok:#1FA860; --bad:#D4443A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.7; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  .hero{
+    background:linear-gradient(120deg,#1b2a4a 0%,#223a6b 40%,#2a4f8f 70%,#0E6E9E 130%);
+    color:#fff;padding:64px 0 72px;position:relative;overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;right:-140px;top:-140px;width:460px;height:460px;border-radius:50%;
+    background:radial-gradient(circle,rgba(91,140,255,.40),transparent 68%);
+  }
+  .hero::before{
+    content:"";position:absolute;left:-100px;bottom:-160px;width:380px;height:380px;border-radius:50%;
+    background:radial-gradient(circle,rgba(37,194,168,.30),transparent 68%);
+  }
+  .hero .wrap{position:relative;z-index:1}
+  .badge{
+    display:inline-block;font-size:13px;letter-spacing:.6px;padding:5px 14px;border-radius:999px;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);margin-bottom:18px;
+  }
+  .hero h1{font-size:34px;line-height:1.3;font-weight:800;letter-spacing:-.5px;margin-bottom:14px}
+  .hero h1 span{
+    background:linear-gradient(90deg,#8fb4ff,#5fe0c6);-webkit-background-clip:text;
+    background-clip:text;color:transparent;
+  }
+  .hero p{font-size:15.5px;color:#c8d6ef;max-width:720px;margin-bottom:24px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{
+    font-size:13px;color:#dbe6fa;background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);padding:6px 13px;border-radius:8px;
+  }
+
+  section{padding:52px 0}
+  .sec-title{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px}
+  .sec-sub{color:var(--muted);font-size:14.5px;margin-bottom:30px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:24px}
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;
+    display:flex;flex-direction:column;transition:.25s;box-shadow:0 2px 10px rgba(26,34,51,.05);
+  }
+  .card:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(26,34,51,.13);border-color:#cfdcef}
+  .card-top{padding:26px 28px 20px;display:flex;gap:16px;align-items:flex-start}
+  .mark{
+    width:56px;height:56px;border-radius:15px;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-size:26px;font-weight:800;color:#fff;
+    box-shadow:0 6px 16px rgba(26,34,51,.18);
+  }
+  .card.a .mark{background:linear-gradient(135deg,var(--a1),var(--a2))}
+  .card.b .mark{background:linear-gradient(135deg,var(--b1),var(--b2))}
+  .card-top h3{font-size:19px;font-weight:800;margin-bottom:4px;letter-spacing:-.2px}
+  .card-top .tag{font-size:12.5px;color:var(--muted)}
+  .status{display:inline-flex;align-items:center;gap:6px;font-size:12px;margin-top:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#b9c4d6}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(31,168,96,.15)}
+  .dot.bad{background:var(--bad)}
+  .status.ok{color:var(--ok)} .status.bad{color:var(--bad)}
+  .card-body{padding:0 28px 20px;flex:1}
+  .card-body p{font-size:14px;color:#41506b;margin-bottom:14px}
+  .feat{list-style:none;display:flex;flex-direction:column;gap:8px}
+  .feat li{font-size:13.5px;color:#3c4a63;padding-left:20px;position:relative}
+  .feat li::before{
+    content:"";position:absolute;left:0;top:8px;width:8px;height:8px;border-radius:50%;
+    background:var(--accent);opacity:.85;
+  }
+  .card.b .feat li::before{background:var(--teal)}
+  .card-foot{padding:16px 28px 22px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;
+    padding:9px 18px;border-radius:10px;border:1px solid var(--border);background:#fff;
+    color:#33415c;transition:.18s;cursor:pointer;
+  }
+  .btn:hover{background:#f1f5fc;border-color:#c9d8ee}
+  .btn.primary{background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;border-color:transparent}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.teal{background:linear-gradient(135deg,var(--b1),var(--b2));color:#fff;border-color:transparent}
+  .btn.teal:hover{filter:brightness(1.08)}
+
+  .note{
+    background:#fff8e9;border:1px solid #f6e0b0;border-left:4px solid var(--gold);
+    border-radius:12px;padding:16px 20px;font-size:14px;color:#6b5320;margin:26px 0 0;
+  }
+  .note b{color:#8a6110}
+  .note.warn{
+    background:#fff1f0;border-color:#f7cdc8;border-left-color:#d9534f;color:#7d3b36;
+  }
+  .note.warn b{color:#b33b34}
+
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:6px}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
+  .step .n{
+    width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,var(--a1),var(--a2));margin-bottom:10px;
+  }
+  .step h4{font-size:14.5px;font-weight:700;margin-bottom:5px}
+  .step p{font-size:13px;color:var(--muted);line-height:1.6}
+
+  footer{background:#111a2c;color:#93a3c0;padding:28px 0;font-size:13px;margin-top:20px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media(max-width:640px){
+    .hero h1{font-size:26px}
+    .cards{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="badge">城市中国 · 湖北通城网｜招聘频道数据工具</div>
+    <h1>综合数据面板：两套工具，<span>一次装进一个 exe</span></h1>
+    <p>
+      平台 <strong>7 大类目数据</strong>（含图片电话 OCR、简历全量字段补抓）与
+      <strong>企业投递简历采集</strong>（企业 → 岗位 → 投递 → 完整简历）集成在同一个面板里。
+      后台 Cookie 与前台 Cookie <strong>只需填一次</strong>，两个工具共享。
+    </p>
+    <div class="chips">
+      <span class="chip">一个 exe · 一个端口</span>
+      <span class="chip">配置共享</span>
+      <span class="chip">本地运行 · 数据不上传</span>
+      <span class="chip">Excel / ZIP 导出</span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2 class="sec-title">选择工具</h2>
+    <p class="sec-sub">点击卡片进入对应工具；两个工具可在不同浏览器标签页同时使用。</p>
+
+    <div class="cards">
+
+      <!-- 工具一：平台数据 -->
+      <div class="card a">
+        <div class="card-top">
+          <div class="mark">&#9636;</div>
+          <div>
+            <h3>平台数据面板</h3>
+            <div class="tag">/city/ · 7 类目全量抓取</div>
+            <div class="status" id="stCity"><span class="dot"></span>读取配置中…</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>一键抓取招聘后台 <strong>7 个类目</strong>的全量数据，电话图片自动 OCR，简历库还能补抓<strong>完整简历字段</strong>。</p>
+          <ul class="feat">
+            <li>订单管理 / 全职岗位 / 兼职岗位 / 企业库 / 会员企业 / 简历库 / 注册用户</li>
+            <li>base64 图片电话自动 OCR（RapidOCR 离线识别）</li>
+            <li>简历全量字段补抓：工作/教育经历、语言能力、获得证书（91 → 116 列）</li>
+            <li>类目勾选导出：单类目 xlsx，多类目自动打 zip</li>
+            <li>前台简历抓取自带限速与断点续抓，避免被站点安全策略拦截</li>
+          </ul>
+        </div>
+        <div class="card-foot">
+          <a class="btn primary" href="/city/">进入平台数据面板 →</a>
+        </div>
+      </div>
+
+      <!-- 工具二：企业投递简历 -->
+      <div class="card b">
+        <div class="card-top">
+          <div class="mark">&#9998;</div>
+          <div>
+            <h3>企业投递简历采集面板</h3>
+            <div class="tag">/jd/ · 企业 → 岗位 → 投递 → 完整简历</div>
+            <div class="status" id="stJd"><span class="dot"></span>读取配置中…</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>按企业名称出发，顺着 <strong>企业 → 岗位 → 投递简历 → 简历详情</strong> 一链到底，输出单表多页 Excel。</p>
+          <ul class="feat">
+            <li>企业名称模糊搜索，选中后拉取该企业全部岗位</li>
+            <li>投递明细：投递人、时间、明文电话/邮箱/QQ</li>
+            <li>简历全量解析：基本信息、期望职位薪资、自我描述、工作/教育经历、语言与证书</li>
+            <li>内置反爬限速（默认 1 请求/秒），命中站点拦截时自动熔断停止，保护账号不被封</li>
+          </ul>
+        </div>
+        <div class="card-foot">
+          <a class="btn teal" href="/jd/">进入企业投递简历面板 →</a>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="note">
+      <b>配置共享说明：</b>两个工具共用同一份 <code>config.json</code>（后台 Cookie、前台 Cookie、保存目录）。
+      在任一工具里填写并保存后，另一个工具立即可用，无需重复填写。
+      各自的抓取缓存分别存放在 <code>数据_平台面板/</code> 与 <code>数据_简历面板/</code>。
+    </div>
+
+    <div class="note warn">
+      <b>关于反爬限速：</b>前台简历详情页 <code>/post/qiuzhi/{id}x.html</code> 有站点安全策略，
+      短时间高频访问会返回带滑动验证的 <code>403</code>，并把访问 IP 临时拉黑。
+      因此两个工具里的前台简历抓取都<b>默认限速 1 请求/秒</b>（与手工抓取一致的速率），
+      连续命中拦截会自动熔断停止。若提示「被站点安全策略拦截」，
+      请等几分钟再点「只补抓简历库详情」续抓，或把「前台请求间隔」调大。
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec-title">快速开始</h2>
+    <p class="sec-sub">首次使用按下面四步走。</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <h4>进入任一工具</h4>
+        <p>点击上方卡片进入工具页面（建议两个工具各开一个浏览器标签页）。</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h4>填后台 Cookie</h4>
+        <p>后台账号密码，或直接粘贴登录后的后台 Cookie，点「测试」验证。</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h4>填前台 Cookie</h4>
+        <p>要拿<b>完整简历内容</b>时，粘贴前台站点 www.hbtc.ccoo.cn 的 Cookie，点「测试前台 Cookie」。填一次两个工具通用。</p>
+      </div>
+      <div class="step">
+        <div class="n">4</div>
+        <h4>抓取并导出</h4>
+        <p>选择类目 / 企业开始抓取，完成后勾选导出到指定目录。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>城市中国·湖北通城网 综合数据面板 &nbsp;·&nbsp; 仅供授权账号内部数据整理使用</div>
+    <div>本地服务 · 数据不出本机</div>
+  </div>
+</footer>
+
+<script>
+async function probe(url, elId){
+  const el = document.getElementById(elId);
+  const dot = el.querySelector('.dot');
+  try{
+    const r = await fetch(url);
+    const c = await r.json();
+    const ck = !!(c.cookie && c.cookie.trim());
+    const fck = !!(c.front_cookie && c.front_cookie.trim());
+    el.className = 'status ' + (ck ? 'ok' : 'bad');
+    dot.className = 'dot ' + (ck ? 'ok' : 'bad');
+    el.innerHTML = '';
+    el.appendChild(dot);
+    el.appendChild(document.createTextNode(
+      ck ? (fck ? '已配置后台 + 前台 Cookie' : '已配置后台 Cookie，前台 Cookie 未配置（简历详情需要）')
+         : '尚未配置 Cookie'));
+  }catch(e){
+    el.className = 'status bad';
+    dot.className = 'dot bad';
+    el.innerHTML = '';
+    el.appendChild(dot);
+    el.appendChild(document.createTextNode('服务未响应'));
+  }
+}
+probe('/city/api/config', 'stCity');
+probe('/jd/api/config',   'stJd');
+</script>
+
+</body>
+</html>

@@ -304,11 +304,93 @@ def is_login_page(html):
     """判断是否返回了「需登录」页（无简历内容）"""
     if not html:
         return True
+    if is_waf_block(html):
+        return False
     if '<div class="j-name">' in html or 'class="j-name"' in html:
         return False
     if 'j-work' in html and 'j-name' in html:
         return False
     return _LOGIN_PAGE_MARK in html or 'j-tx' not in html
+
+
+# ----------------------------------------------------------------------
+# 反爬：WAF 拦截识别 + 全局限速 + 冷却退避
+#
+# 实测结论：站点前置 nginx WAF 会对前台简历页的高频访问直接返回 403
+# 滑动验证页（"疑似异常访问请求…IP频繁访问"）。8 线程连续抓 200 份时，
+# 大约第 120 份开始被拦截，之后整段 IP 短时黑名单，全部请求 403。
+# 因此必须：① 全局限速（任意两次请求之间强制间隔）② 命中即冷却。
+# ----------------------------------------------------------------------
+_WAF_MARKS = ('网络安全验证', '疑似异常访问请求', 'IP频繁访问',
+              '访问操作提示', '系统拦截')
+
+# 全局限速：任意两次前台请求之间至少间隔这么多秒。
+# 默认 1.0 ≈ 1 请求/秒 —— 与用户原始脚本 time.sleep(1) 的速率一致（实测安全）。
+MIN_INTERVAL = 1.0
+# 同时的在途请求数上限（并发连接数）。1 = 完全串行，最安全。
+MAX_INFLIGHT = 2
+_RATE_LOCK = threading.Lock()
+_inflight = threading.Semaphore(2)
+_rate_state = {'next_at': 0.0}
+_waf_until = [0.0]
+# 命中的 WAF 冷却时长基准（秒），按重试次数递增
+WAF_COOLDOWN = 60.0
+
+
+def is_waf_block(html, status=None):
+    """判断响应是否被站点 WAF 拦截（滑动验证页）"""
+    if status == 403:
+        return True
+    if not html:
+        return False
+    return any(m in html for m in _WAF_MARKS)
+
+
+def set_rate(min_interval=None, max_inflight=None):
+    """调整全局限速。interval 越大越安全；max_inflight 越小越安全。"""
+    global MIN_INTERVAL, MAX_INFLIGHT, _inflight
+    if min_interval is not None:
+        try:
+            MIN_INTERVAL = max(0.0, float(min_interval))
+        except (TypeError, ValueError):
+            pass
+    if max_inflight is not None:
+        try:
+            n = max(1, int(max_inflight))
+            if n != MAX_INFLIGHT:
+                MAX_INFLIGHT = n
+                _inflight = threading.Semaphore(n)
+        except (TypeError, ValueError):
+            pass
+    return MIN_INTERVAL, MAX_INFLIGHT
+
+
+def _throttle():
+    """阻塞到本线程可以发起下一次请求的时刻（全局限速 + WAF 冷却）。
+
+    注意：判断与占位在锁内完成，但**睡眠在锁外**，
+    否则多个线程会串行地各睡一遍，批量抓取时越等越久。
+    """
+    while True:
+        with _RATE_LOCK:
+            now = time.time()
+            wait = max(_rate_state['next_at'], _waf_until[0]) - now
+            if wait <= 0:
+                _rate_state['next_at'] = now + MIN_INTERVAL
+                return
+        time.sleep(min(wait, 1.0))
+
+
+def _trip_waf(cooldown=None):
+    """命中 WAF：设置全局冷却截止时间，让所有线程一起停下来"""
+    cd = WAF_COOLDOWN if cooldown is None else cooldown
+    with _RATE_LOCK:
+        _waf_until[0] = max(_waf_until[0], time.time() + cd)
+
+
+def waf_cooldown_remain():
+    """距离 WAF 冷却结束还剩多少秒（0 表示未被冷却）"""
+    return max(0.0, _waf_until[0] - time.time())
 
 
 def parse_front_resume(html, jlid=''):
@@ -446,14 +528,21 @@ def _session(cookie_str=None):
 
 
 def fetch_one(jlid, cookie_str, timeout=25, retries=3, session=None):
-    """抓取并解析单份简历。成功返回 dict，失败返回 None。"""
+    """抓取并解析单份简历。成功返回 dict，失败返回 {'_error': ...}。"""
     url = resume_url(jlid)
     last = None
     for attempt in range(max(1, retries)):
         try:
+            _throttle()                      # 全局限速 + WAF 冷却
             s = session or _session(cookie_str)
-            r = s.get(url, headers=FRONT_HEADERS, timeout=timeout)
+            with _inflight:                  # 限制在途并发连接数
+                r = s.get(url, headers=FRONT_HEADERS, timeout=timeout)
             r.encoding = 'utf-8'
+            if is_waf_block(r.text, r.status_code):
+                # 被 WAF 拦截：立刻返回，不做任何等待或重试。
+                # 等待/重试只会继续加压、把 IP 打进更长的黑名单；
+                # 由 fetch_many 的熔断计数在几秒内终止整批任务。
+                return {'_error': 'waf_block', '简历ID': jlid}
             if r.status_code != 200:
                 last = f'HTTP {r.status_code}'
                 time.sleep(0.5 * (attempt + 1))
@@ -473,20 +562,34 @@ def fetch_one(jlid, cookie_str, timeout=25, retries=3, session=None):
     return {'_error': str(last or 'unknown'), '简历ID': jlid}
 
 
-def fetch_many(jlids, cookie_str, workers=6, on_progress=None, should_stop=None,
-               timeout=25, retries=3):
+def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
+               timeout=25, retries=3, min_interval=None, max_inflight=None,
+               waf_stop_after=3):
     """
-    并发抓取多份简历。返回 {jlid: detail_dict}
+    并发抓取多份简历。返回 (out, stats)
+
+      out    : {jlid: detail_dict}    只含成功的
+      stats  : {'done','ok','fail','need_login','waf_block','total','stopped'}
+
     on_progress(done, total, ok, fail) 每完成一份回调一次
     should_stop() 返回 True 时提前结束
+
+    ⚠️ 并发只在「全局限速」的框架内生效：无论 workers 多大，实际请求速率
+    都被 MIN_INTERVAL 卡住（默认 1 请求/秒，与站点可承受速率一致），
+    同时在途连接数也被 MAX_INFLIGHT 限制。一旦命中 WAF 达到
+    waf_stop_after 次，直接停止剩余任务，避免把 IP 打进更长时间的黑名单。
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    if min_interval is not None or max_inflight is not None:
+        set_rate(min_interval, max_inflight)
 
     total = len(jlids)
     out = {}
     done = ok = fail = 0
     lock = threading.Lock()
-    need_login = [0]
+    counters = {'need_login': 0, 'waf_block': 0}
+    stopped = [False]
 
     def work(jid):
         one = requests.Session()
@@ -498,9 +601,10 @@ def fetch_many(jlids, cookie_str, workers=6, on_progress=None, should_stop=None,
     with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
         futs = [ex.submit(work, j) for j in jlids]
         for fu in as_completed(futs):
-            if should_stop and should_stop():
+            if stopped[0] or (should_stop and should_stop()):
                 for f in futs:
                     f.cancel()
+                stopped[0] = True
                 break
             jid, res = fu.result()
             with lock:
@@ -510,12 +614,19 @@ def fetch_many(jlids, cookie_str, workers=6, on_progress=None, should_stop=None,
                     ok += 1
                 else:
                     fail += 1
-                    if res and res.get('_error') == 'need_login':
-                        need_login[0] += 1
+                    err = (res or {}).get('_error')
+                    if err == 'need_login':
+                        counters['need_login'] += 1
+                    elif err == 'waf_block':
+                        counters['waf_block'] += 1
+                if counters['waf_block'] >= waf_stop_after:
+                    stopped[0] = True
                 if on_progress:
                     on_progress(done, total, ok, fail)
     return out, {'done': done, 'ok': ok, 'fail': fail,
-                 'need_login': need_login[0], 'total': total}
+                 'need_login': counters['need_login'],
+                 'waf_block': counters['waf_block'],
+                 'total': total, 'stopped': stopped[0]}
 
 
 def test_front_cookie(cookie_str, probe_jlid='1906236'):
@@ -525,10 +636,14 @@ def test_front_cookie(cookie_str, probe_jlid='1906236'):
     res = fetch_one(probe_jlid, cookie_str, timeout=20, retries=2)
     if not res:
         return False, '请求失败（网络或超时），请重试', ''
-    if res.get('_error') == 'need_login':
+    err = res.get('_error')
+    if err == 'need_login':
         return False, '前台 Cookie 已失效，请重新登录 www.hbtc.ccoo.cn 后复制最新 Cookie', ''
-    if res.get('_error'):
-        return False, f'抓取失败：{res["_error"]}', ''
+    if err == 'waf_block':
+        return False, ('已被站点安全策略拦截（IP 频繁访问），请等十几分钟后再试、'
+                       '并把「抓取线程」调小'), ''
+    if err:
+        return False, f'抓取失败：{err}', ''
     return True, f'有效（示例简历：{res.get("姓名") or "—"}）', res.get('姓名', '')
 
 

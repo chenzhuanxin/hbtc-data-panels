@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>城市中国·湖北通城网 招聘频道 平台数据面板</title>
+<style>
+:root{
+  --bg:#f4f6fa; --card:#ffffff; --line:#e3e8f0; --txt:#2b3446; --sub:#7a8699;
+  --blue:#2f6fed; --blue-d:#1e56c8; --green:#18a058; --red:#d03a3a; --orange:#e8890c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+.wrap{max-width:1280px;margin:0 auto;padding:16px 20px 60px}
+h1{font-size:20px;margin:6px 0 16px;display:flex;align-items:center;gap:10px}
+h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--blue)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(20,30,60,.04)}
+.card h2{font-size:15px;margin-bottom:12px;color:var(--blue-d)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)}
+input[type=text],input[type=password],textarea{border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:13px;outline:none;background:#fbfcfe}
+input[type=text]:focus,input[type=password]:focus,textarea:focus{border-color:var(--blue)}
+textarea{width:100%;min-height:64px;resize:vertical;font-family:Consolas,monospace;font-size:12px}
+button{border:none;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;background:var(--blue);color:#fff;transition:.15s}
+button:hover{background:var(--blue-d)}
+button.ghost{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+button.ghost:hover{background:#eef4ff}
+button.gray{background:#8b95a7}
+button.gray:hover{background:#76808f}
+button:disabled{opacity:.55;cursor:not-allowed}
+.muted{color:var(--sub);font-size:12px}
+.msg{font-size:12px;margin-left:6px}
+.msg.ok{color:var(--green)} .msg.err{color:var(--red)}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.cat{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fbfcfe}
+.cat .t{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.cat .meta{margin-top:6px;font-size:12px;color:var(--sub)}
+.cat.dis{opacity:.55}
+.bar{height:6px;border-radius:3px;background:#e8edf5;margin-top:8px;overflow:hidden;display:none}
+.bar>i{display:block;height:100%;width:0;background:var(--blue);transition:width .3s}
+.bar.err>i{background:var(--red)} .bar.ok>i{background:var(--green)}
+.pstat{font-size:12px;color:var(--sub);margin-top:5px;min-height:16px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border:1px solid var(--line);padding:5px 8px;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+th{background:#eef3fb;position:sticky;top:0}
+tbody tr:nth-child(even){background:#fafbfe}
+.tw{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tab{padding:6px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:#fff;font-size:13px}
+.tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.pager{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px}
+.pager button{padding:4px 12px}
+.search input{width:260px}
+#exportResult{margin-top:8px;font-size:13px}
+.filelink{color:var(--blue);cursor:pointer;text-decoration:underline;word-break:break-all}
+.badge{display:inline-block;font-size:11px;background:#eef4ff;color:var(--blue);border-radius:4px;padding:1px 6px;margin-left:6px}
+.kv{font-size:12px;color:var(--sub)}
+.topline{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+/* ---- 导出类目勾选 ---- */
+.selbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;
+  padding-bottom:10px;border-bottom:1px dashed var(--line)}
+.selbar button{padding:5px 12px;font-size:12px}
+.selbar label.kv{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--txt)}
+.selbar input[type=checkbox]{width:15px;height:15px;cursor:pointer}
+#selCount{font-size:12px;font-weight:600;margin-left:auto}
+.catsel{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.cchip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;
+  padding:9px 11px;background:#fbfcfe;cursor:pointer;user-select:none;transition:.15s;font-size:13px}
+.cchip:hover{border-color:var(--blue);background:#f4f8ff}
+.cchip input{width:15px;height:15px;flex:none;cursor:pointer}
+.cchip .cn{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cchip .cc{font-size:11px;color:var(--sub);white-space:nowrap}
+.cchip.on{border-color:var(--blue);background:#eef4ff;box-shadow:inset 0 0 0 1px var(--blue)}
+.cchip.on .cn{color:var(--blue-d)}
+.cchip.dis{opacity:.5;cursor:not-allowed;background:#f6f7f9}
+.cchip.dis:hover{border-color:var(--line);background:#f6f7f9}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot"></span>城市中国·湖北通城网 招聘频道 · 平台数据面板</h1>
+
+  <!-- 连接设置 -->
+  <div class="card">
+    <h2>① 连接设置（账号 / 密码 / Cookie）</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="f">账号<input type="text" id="username" style="width:200px" placeholder="hbtongchengccoo"></label>
+      <label class="f">密码<input type="password" id="password" style="width:200px" placeholder="••••••••"></label>
+      <label class="f">验证码<div class="row"><input type="text" id="code" style="width:90px" placeholder="区分大小写">
+        <img id="captchaImg" style="height:34px;border:1px solid var(--line);border-radius:4px;cursor:pointer" title="点击刷新" onclick="App.refreshCaptcha()"></div></label>
+      <label class="f">&nbsp;<button class="ghost" onclick="App.doLogin()">验证码登录</button></label>
+      <span class="muted">没有验证码时可直接粘贴下方 Cookie</span>
+    </div>
+    <label class="f" style="width:100%">Cookie（从浏览器登录后台后复制，分号分隔）</label>
+    <textarea id="cookie" placeholder="ccoocitycrm=...; ASP.NET_SessionId=...; siteid="></textarea>
+
+    <label class="f" style="width:100%;margin-top:12px">
+      前台 Cookie
+      <b style="color:#e0552b">（抓取简历库完整内容必需）</b>
+    </label>
+    <textarea id="frontCookie" placeholder="登录 www.hbtc.ccoo.cn 后复制：PHPSESSID=...; ccoo=logintime=...&amp;uid=...; siteid=880; sitename=..."></textarea>
+    <div class="row" style="margin-top:8px;gap:10px;align-items:center">
+      <button class="ghost" onclick="App.testFrontCookie()">测试前台 Cookie</button>
+      <span id="frontMsg" class="msg"></span>
+      <span class="muted">
+        简历库的完整内容（工作经历 1-10 / 教育经历 / 语言能力 / 获得证书 / 职位类别 / 现居地）
+        来自前台简历页 <code>/post/qiuzhi/{id}x.html</code>，需要前台登录 Cookie。
+        不填则简历库只有列表字段。
+      </span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button onclick="App.saveConfig()">保存配置</button>
+      <button class="ghost" onclick="App.testCookie()">测试连接</button>
+      <button class="ghost" onclick="App.exportConfig()">导出配置(JSON)</button>
+      <label class="f">导入配置(JSON)<input type="file" id="importFile" accept=".json" style="font-size:12px"></label>
+      <label class="f">OCR放大倍数<input type="text" id="ocrScale" style="width:60px" value="1" title="RapidOCR 建议 1（实测 1 倍最准）"></label>
+      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
+      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="1" title="任意两次前台简历请求之间的最小间隔（秒）。1 ≈ 1 请求/秒，与站点可承受速率一致；调小会更快但可能被站点安全策略拦截"></label>
+      <span id="connMsg" class="msg"></span>
+    </div>
+  </div>
+
+  <!-- 类目抓取 -->
+  <div class="card">
+    <div class="topline">
+      <h2 style="margin-bottom:0">② 数据抓取</h2>
+      <div class="row">
+        <span class="kv">单类目限抓页数(0=全部) <input type="text" id="maxPages" value="0" style="width:60px"></span>
+        <label class="kv" title="抓取简历库后，自动逐份打开前台简历详情页，补全工作经历/教育经历/语言/证书等全量字段（需要前台 Cookie）">
+          <input type="checkbox" id="withDetail" checked> 抓取简历详情（全量）
+        </label>
+        <span class="kv">详情限抓条数(0=全部) <input type="text" id="detailLimit" value="0" style="width:70px"></span>
+        <button class="ghost" onclick="App.enrichResume()">只补抓简历库详情</button>
+        <button class="ghost" onclick="App.fetchAll()">一键抓取全部类目</button>
+      </div>
+    </div>
+    <div class="cats" id="cats" style="margin-top:12px"></div>
+  </div>
+
+  <!-- 数据浏览 -->
+  <div class="card">
+    <h2>③ 数据浏览</h2>
+    <div class="tabs" id="tabs"></div>
+    <div class="row search" style="margin-bottom:10px">
+      <input type="text" id="kw" placeholder="搜索（显示列，回车搜索）">
+      <button class="ghost" onclick="App.loadData()">搜索</button>
+      <label class="kv"><input type="checkbox" id="onlyShow" checked onchange="App.renderTable()"> 只显示重要列</label>
+      <span id="dataMeta" class="kv"></span>
+    </div>
+    <div class="tw"><table id="dataTable"><thead></thead><tbody></tbody></table></div>
+    <div class="pager">
+      <button onclick="App.page(-1)">上一页</button>
+      <span id="pageInfo"></span>
+      <button onclick="App.page(1)">下一页</button>
+      <span class="muted">每页 50 条</span>
+    </div>
+  </div>
+
+  <!-- 导出 -->
+  <div class="card">
+    <h2>④ 导出 Excel（全选 / 单选 / 多选类目 · 选择目录 · 自动命名）</h2>
+
+    <div class="selbar">
+      <label class="kv"><input type="checkbox" id="selAll" onchange="App.toggleSelAll(this.checked)"> <b>全选</b></label>
+      <button class="ghost" onclick="App.selectNone()">全不选</button>
+      <button class="ghost" onclick="App.selectInvert()">反选</button>
+      <button class="ghost" onclick="App.selectReady()">只选已抓取</button>
+      <span id="selCount">未勾选任何类目</span>
+    </div>
+
+    <div class="catsel" id="exportCats"></div>
+
+    <div class="row" style="margin-top:12px">
+      <label class="f">保存目录<div class="row">
+        <input type="text" id="saveDir" style="width:420px" placeholder="选择或输入目录">
+        <button class="ghost" onclick="App.pickDir()">选择目录…</button></div></label>
+      <button id="btnExport" style="align-self:flex-end" onclick="App.doExport()">开始导出</button>
+      <span id="exportMsg" class="msg"></span>
+    </div>
+    <div class="bar" id="exportBar"><i></i></div>
+    <div id="exportResult"></div>
+    <p class="muted" style="margin-top:8px">说明：勾选 <b>1 个</b>类目 → 直接下载该 Excel；勾选 <b>多个</b>类目 → 自动打包成 zip；灰色「未抓取」的类目不可勾选，请先在 ② 中抓取。Excel 保留全部字段（第1行英文字段、第2行中文表头），次要字段自动设为隐藏列，文件名按「类目+时间」自动生成。</p>
+  </div>
+</div>
+
+<script>
+const App=(()=>{
+  const $=s=>document.querySelector(s);
+  const API='';
+  let CATS=[],INFO={},HIDDEN={},ZH={},EN=[],curCat='',curPage=1,curTotal=0,curCols=[],curRows=[];
+  let lastExportCats=[];
+
+  async function jget(u){const r=await fetch(API+u);return r.json();}
+  async function jpost(u,d){const r=await fetch(API+u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d||{})});return r.json();}
+
+  async function init(){
+    const cfg=await jget('/city/api/config');
+    $('#username').value=cfg.username||''; $('#password').value=cfg.password||'';
+    $('#cookie').value=cfg.cookie||''; $('#saveDir').value=cfg.save_dir||'';
+    $('#frontCookie').value=cfg.front_cookie||'';
+    $('#ocrScale').value=cfg.ocr_scale||1;
+    $('#fetchWorkers').value=cfg.fetch_workers||4;
+    $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?1:cfg.front_rate;
+    if($('#withDetail')) $('#withDetail').checked=(cfg.fetch_resume_detail===undefined?true:!!cfg.fetch_resume_detail);
+    if($('#detailLimit')) $('#detailLimit').value=cfg.resume_detail_limit||0;
+    if(!cfg.front_cookie) flash($('#frontMsg'),'未配置前台 Cookie，简历库将没有完整内容','warn');
+    const c=await jget('/city/api/categories');
+    CATS=c.cats; INFO=c.info; HIDDEN=c.hidden; ZH=c.zh; EN=c.en;
+    renderCats(c.unavailable); renderTabs(); renderExportCats();
+    if(CATS.length){curCat=CATS[0]; markTab();}
+    await loadData();
+    pollProgress();
+    $('#importFile').addEventListener('change',importConfig);
+    $('#kw').addEventListener('keydown',e=>{if(e.key==='Enter')loadData();});
+  }
+
+  function renderCats(unavail){
+    const box=$('#cats'); box.innerHTML='';
+    for(const c of CATS){
+      const d=document.createElement('div'); d.className='cat'; d.id='cat_'+c;
+      d.innerHTML=`<div class="t"><span>${c}${INFO[c].ocr?'<span class="badge">电话OCR</span>':''}</span>
+        <button onclick="App.fetchOne('${c}')">抓取</button></div>
+        <div class="meta" id="meta_${c}">${INFO[c].rows?INFO[c].rows.toLocaleString()+' 条 · '+INFO[c].fetched_at:'尚未抓取'}</div>
+        <div class="bar" id="bar_${c}"><i></i></div>
+        <div class="pstat" id="pstat_${c}"></div>`;
+      box.appendChild(d);
+    }
+    for(const [u,why] of Object.entries(unavail||{})){
+      const d=document.createElement('div'); d.className='cat dis';
+      d.innerHTML=`<div class="t"><span>${u}</span></div><div class="meta">${why}</div>`;
+      box.appendChild(d);
+    }
+  }
+
+  function renderTabs(){
+    const t=$('#tabs'); t.innerHTML='';
+    CATS.forEach(c=>{
+      const d=document.createElement('div'); d.className='tab'+(c===curCat?' on':'');
+      d.textContent=c; d.onclick=()=>{curCat=c;curPage=1;markTab();loadData();};
+      t.appendChild(d);
+    });
+  }
+  function markTab(){document.querySelectorAll('#tabs .tab').forEach((el,i)=>el.classList.toggle('on',CATS[i]===curCat));}
+
+  // ==================== 导出类目选择（全选 / 单选 / 多选）====================
+  // 勾选状态独立保存在 selCats 里，DOM 重绘不再丢失用户的选择
+  const selCats=new Set();       // 当前勾选的类目
+  const knownReady=new Set();    // 曾经"已抓取"的类目，用于把新抓到的类目默认勾上
+  const catRows=c=>(INFO[c]&&INFO[c].rows)||0;
+  const isReady=c=>catRows(c)>0;
+
+  function renderExportCats(){
+    // 类目集合变化时清理失效选择
+    [...selCats].forEach(c=>{if(!CATS.includes(c))selCats.delete(c);});
+    // 首次加载 / 新抓取完成的类目 → 默认勾选；无数据的类目不可选
+    CATS.forEach(c=>{
+      if(isReady(c)){
+        if(!knownReady.has(c)){knownReady.add(c);selCats.add(c);}
+      }else{
+        knownReady.delete(c);selCats.delete(c);
+      }
+    });
+    const box=$('#exportCats'); box.innerHTML='';
+    CATS.forEach(c=>{
+      const n=catRows(c), ok=n>0, on=ok&&selCats.has(c);
+      const d=document.createElement('label');
+      d.className='cchip'+(on?' on':'')+(ok?'':' dis');
+      d.title=ok?`${c} · ${n.toLocaleString()} 条`:`${c} · 尚未抓取，请先在 ② 数据抓取 中抓取`;
+      d.innerHTML=`<input type="checkbox" value="${c}"${on?' checked':''}${ok?'':' disabled'}>
+        <span class="cn">${c}</span><span class="cc">${ok?n.toLocaleString()+' 条':'未抓取'}</span>`;
+      const cb=d.querySelector('input');
+      cb.addEventListener('change',()=>{
+        cb.checked?selCats.add(c):selCats.delete(c);
+        d.classList.toggle('on',cb.checked);
+        syncSelUI();
+      });
+      box.appendChild(d);
+    });
+    syncSelUI();
+  }
+
+  // 同步「全选」状态、已选统计、导出按钮可用性
+  function syncSelUI(){
+    const ready=CATS.filter(isReady);
+    const sel=CATS.filter(c=>selCats.has(c));
+    const all=$('#selAll');
+    if(all){
+      all.checked=ready.length>0&&ready.every(c=>selCats.has(c));
+      all.indeterminate=!all.checked&&sel.length>0;  // 半选态
+      all.disabled=ready.length===0;
+    }
+    const sc=$('#selCount');
+    if(sc){
+      const tot=sel.reduce((s,c)=>s+catRows(c),0);
+      sc.textContent=sel.length?`已选 ${sel.length} 个类目 · 共 ${tot.toLocaleString()} 条`:'未勾选任何类目';
+      sc.style.color=sel.length?'var(--blue)':'var(--sub)';
+    }
+    const btn=$('#btnExport');
+    if(btn)btn.disabled=sel.length===0;
+  }
+
+  function toggleSelAll(on){
+    CATS.filter(isReady).forEach(c=>{on?selCats.add(c):selCats.delete(c);});
+    renderExportCats();
+  }
+  function selectNone(){selCats.clear();renderExportCats();}
+  function selectReady(){CATS.filter(isReady).forEach(c=>selCats.add(c));renderExportCats();}
+  function selectInvert(){
+    CATS.filter(isReady).forEach(c=>{selCats.has(c)?selCats.delete(c):selCats.add(c);});
+    renderExportCats();
+  }
+
+  async function loadData(){
+    if(!curCat)return;
+    const kw=$('#kw').value.trim();
+    const d=await jget(`/city/api/data?cat=${encodeURIComponent(curCat)}&page=${curPage}&size=50&kw=${encodeURIComponent(kw)}`);
+    curCols=d.cols||[]; curRows=d.rows||[]; curTotal=d.total||0;
+    $('#dataMeta').textContent=d.ok?`共 ${curTotal.toLocaleString()} 条（抓取于 ${d.fetched_at}）`:'该类目尚未抓取数据';
+    renderTable();
+  }
+  function renderTable(){
+    const only=$('#onlyShow') && $('#onlyShow').checked;
+    const thead=$('#dataTable thead'),tbody=$('#dataTable tbody');
+    const idx=[],heads=[];
+    (curCols||[]).forEach((c,i)=>{
+      if(only && (HIDDEN[curCat]||[]).includes(c))return;
+      idx.push(i); heads.push((ZH[curCat]&&ZH[curCat][i])||c);
+    });
+    thead.innerHTML='<tr>'+heads.map(h=>`<th>${h}</th>`).join('')+'</tr>';
+    tbody.innerHTML=curRows.map(r=>'<tr>'+idx.map(i=>{
+      let v=r[i]==null?'':String(r[i]);
+      if(v.length>120)v=v.slice(0,120)+'…';
+      return `<td title="${v.replace(/"/g,'&quot;')}">${v.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>`;
+    }).join('')+'</tr>').join('');
+    const pages=Math.max(1,Math.ceil(curTotal/50));
+    $('#pageInfo').textContent=`第 ${curPage} / ${pages} 页`;
+  }
+  function page(dv){const pages=Math.max(1,Math.ceil(curTotal/50));curPage=Math.min(pages,Math.max(1,curPage+dv));loadData();}
+
+  async function fetchOne(c){
+    await saveConfig();
+    await jpost('/city/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,
+      with_detail:$('#withDetail')&&$('#withDetail').checked});
+  }
+  async function fetchAll(){
+    await saveConfig();
+    const wd=$('#withDetail')?$('#withDetail').checked:true;
+    for(const c of CATS){await jpost('/city/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,with_detail:wd});}
+  }
+  async function testFrontCookie(){
+    flash($('#frontMsg'),'正在测试前台 Cookie…','warn');
+    const r=await jpost('/city/api/front_test',{front_cookie:$('#frontCookie').value});
+    flash($('#frontMsg'),(r.ok?'✔ ':'✘ ')+r.msg,r.ok?'ok':'err');
+  }
+  async function enrichResume(){
+    await saveConfig();
+    flash($('#frontMsg'),'已开始补抓简历库详情，请看抓取进度…','warn');
+    await jpost('/city/api/enrich_resume',{});
+  }
+
+  let pollTimer=null;
+  async function pollProgress(){
+    try{
+      const p=await jget('/city/api/progress');
+      let changed=false;
+      for(const [c,st] of Object.entries(p||{})){
+        const bar=$('#bar_'+c),ps=$('#pstat_'+c),meta=$('#meta_'+c);
+        if(!bar)continue;
+        bar.style.display='block';
+        bar.className='bar'+(st.phase==='error'?' err':st.phase==='done'?' ok':'');
+        let pct=0;
+        if(st.phase==='done')pct=100;
+        else if(st.pages_total)pct=Math.min(99,Math.round(st.pages_done/st.pages_total*100));
+        else pct=10;
+        bar.firstElementChild.style.width=pct+'%';
+        ps.textContent=st.msg||'';
+        if(st.phase==='done'){
+          const d=await jget(`/city/api/data?cat=${encodeURIComponent(c)}&page=1&size=1`);
+          if(d.ok){INFO[c].rows=d.total_all;meta.textContent=d.total_all.toLocaleString()+' 条 · 刚刚更新';changed=true;}
+        }
+      }
+      // 导出进度
+      const ep=await jget('/city/api/export_progress');
+      const eb=$('#exportBar'),em=$('#exportMsg'),er=$('#exportResult');
+      if(ep.phase!=='idle'){
+        eb.style.display='block';eb.className='bar'+(ep.phase==='error'?' err':ep.phase==='done'?' ok':'');
+        eb.firstElementChild.style.width=ep.phase==='done'?'100%':(ep.total?Math.min(99,ep.written/ep.total*100)+'%':'20%');
+        em.textContent=ep.msg||'';em.className='msg '+(ep.phase==='error'?'err':'ok');
+        if(ep.phase==='done'){
+          const who=lastExportCats.length?`<div style="margin-bottom:4px">本次导出类目：<b>${lastExportCats.join('、')}</b></div>`:'';
+          er.innerHTML=who+`已完成：<span class="filelink" onclick="App.openPath('${ep.file}')">${ep.file}</span>
+            <button class="ghost" style="margin-left:10px" onclick="App.openPath('${ep.file}')">打开所在文件夹</button>`;
+        }
+      }
+      // 类目行数变化时刷新导出勾选框
+      if(changed)renderExportCats();
+    }finally{
+      pollTimer=setTimeout(pollProgress,1500);
+    }
+  }
+
+  // ---- 配置 ----
+  async function saveConfig(){
+    await jpost('/city/api/config',{username:$('#username').value,password:$('#password').value,
+      cookie:$('#cookie').value,front_cookie:$('#frontCookie').value,
+      save_dir:$('#saveDir').value,ocr_scale:parseInt($('#ocrScale').value)||1,
+      fetch_workers:parseInt($('#fetchWorkers').value)||4,
+      front_rate:parseFloat($('#frontRate').value)||1,
+      fetch_resume_detail:$('#withDetail')&&$('#withDetail').checked?1:0,
+      resume_detail_limit:parseInt($('#detailLimit')&&$('#detailLimit').value)||0});
+    flash($('#connMsg'),'已保存','ok');
+  }
+  async function testCookie(){
+    flash($('#connMsg'),'测试中…','');
+    const r=await jpost('/city/api/test_cookie',{cookie:$('#cookie').value});
+    flash($('#connMsg'),r.msg,r.ok?'ok':'err');
+  }
+  function exportConfig(){window.open(API+'/city/api/config/export','_blank');}
+  async function importConfig(e){
+    const f=e.target.files[0]; if(!f)return;
+    try{
+      const txt=await f.text(); const d=JSON.parse(txt);
+      const r=await jpost('/city/api/config/import',d);
+      flash($('#connMsg'),r.msg||'导入成功',r.ok?'ok':'err');
+      const cfg=await jget('/city/api/config');
+      $('#username').value=cfg.username||'';$('#password').value=cfg.password||'';
+      $('#cookie').value=cfg.cookie||'';$('#saveDir').value=cfg.save_dir||'';
+      $('#ocrScale').value=cfg.ocr_scale||1;
+      $('#frontCookie').value=cfg.front_cookie||'';
+      $('#fetchWorkers').value=cfg.fetch_workers||4;
+      $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?1:cfg.front_rate;
+    }catch(err){flash($('#connMsg'),'导入失败：'+err,'err');}
+    e.target.value='';
+  }
+  async function refreshCaptcha(){
+    const r=await jpost('/city/api/captcha');
+    if(r.ok){$('#captchaImg').src=r.image;}else{flash($('#connMsg'),r.msg,'err');}
+  }
+  async function doLogin(){
+    if(!$('#code').value){await refreshCaptcha();flash($('#connMsg'),'已获取验证码，请输入后点击登录','');return;}
+    const r=await jpost('/city/api/login',{username:$('#username').value,password:$('#password').value,code:$('#code').value});
+    if(r.ok){$('#cookie').value=r.cookie||'';flash($('#connMsg'),r.msg,'ok');}
+    else{flash($('#connMsg'),r.msg,'err');await refreshCaptcha();}
+  }
+  async function pickDir(){
+    const r=await jpost('/city/api/pickdir');
+    if(r.ok&&r.path)$('#saveDir').value=r.path;
+    else if(r.msg)flash($('#exportMsg'),r.msg,'err');
+  }
+  async function doExport(){
+    const cats=CATS.filter(c=>selCats.has(c));        // 以状态为准，不依赖 DOM
+    if(!cats.length){flash($('#exportMsg'),'请先勾选至少一个「已抓取」的类目','err');return;}
+    const dir=$('#saveDir').value.trim();
+    if(!dir){flash($('#exportMsg'),'请先选择保存目录（点「选择目录…」）','err');return;}
+    lastExportCats=cats.slice();
+    $('#exportResult').innerHTML='';
+    flash($('#exportMsg'),`已提交 ${cats.length} 个类目导出…`,'');
+    const r=await jpost('/city/api/export',{cats,dir});
+    flash($('#exportMsg'),r.msg,r.ok?'ok':'err');
+  }
+  async function openPath(p){await jpost('/city/api/open_folder',{path:p});}
+  function flash(el,t,cls){el.textContent=t;el.className='msg '+cls;}
+
+  return {init,fetchOne,fetchAll,loadData,page,renderTable,saveConfig,testCookie,
+          testFrontCookie,enrichResume,
+          exportConfig,refreshCaptcha,doLogin,pickDir,doExport,openPath,
+          toggleSelAll,selectNone,selectInvert,selectReady,renderExportCats};
+})();
+window.App=App;
+App.init();
+</script>
+
+<div style="position:fixed;left:14px;bottom:14px;z-index:9999">
+  <a href="/" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;
+     padding:8px 14px;border-radius:999px;background:#1b2a4a;color:#dbe6fa;
+     text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:.92"
+     onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.92">
+    &#8592; 综合面板首页</a>
+</div>
+</body>
+</html>

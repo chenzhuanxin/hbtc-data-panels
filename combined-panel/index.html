@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>城市中国综合数据面板 · 详细说明</title>
+<meta name="description" content="把平台 7 类数据面板与企业投递简历采集面板装进同一个 exe：一个门户、一个端口、一份共享配置。">
+<style>
+  :root{
+    --bg:#f6f5fb; --card:#fff; --text:#1a2233; --muted:#5b6b85; --border:#e6e3f2; --line:#efedf8;
+    --c1:#8B6CF0; --c2:#4A2FA8; --accent:#6D4AE0; --gold:#F5A623;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.75;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:.88em;
+       background:#f1eefb;color:#3f2f7a;padding:2px 7px;border-radius:6px;border:1px solid #e2ddf6}
+  pre{background:#1d1932;color:#ded8f5;padding:20px 22px;border-radius:14px;overflow-x:auto;
+      font-size:13.2px;line-height:1.72;font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+  pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+
+  .topbar{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:58px}
+  .topbar a.back{font-size:14px;font-weight:600;color:#41506b}
+  .topbar a.back:hover{color:var(--accent);text-decoration:none}
+  .topbar .links{display:flex;gap:16px;font-size:13.5px}
+
+  .hero{background:linear-gradient(135deg,#8B6CF0 0%,#4A2FA8 100%);color:#fff;padding:56px 0 60px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-150px;width:400px;height:400px;border-radius:50%;
+               background:radial-gradient(circle,rgba(255,255,255,.24),transparent 68%)}
+  .hero .wrap{position:relative;z-index:1;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+  .hero img{width:96px;height:96px;border-radius:22px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
+  .hero h1{font-size:32px;font-weight:800;letter-spacing:-.4px;margin-bottom:8px}
+  .hero .sub{font-size:15.5px;color:#e6e0fb}
+  .hero .pill{display:inline-block;font-size:12.5px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+              padding:4px 12px;border-radius:999px;margin-top:12px;margin-right:8px}
+  .hero .pill.new{background:rgba(255,255,255,.9);color:#4A2FA8;font-weight:700;border-color:transparent}
+
+  section{padding:46px 0}
+  section+section{padding-top:0}
+  h2{font-size:22px;font-weight:800;letter-spacing:-.2px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:5px;height:20px;border-radius:3px;background:linear-gradient(180deg,var(--c1),var(--c2))}
+  h3{font-size:16.5px;font-weight:700;margin:24px 0 10px;color:#2b2545}
+  .lead{color:var(--muted);font-size:14.5px;margin-bottom:22px}
+  p{font-size:14.8px;color:#3c4a63;margin-bottom:12px}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px 28px;margin-bottom:18px}
+
+  ul.list{list-style:none;display:flex;flex-direction:column;gap:10px;margin:12px 0}
+  ul.list li{font-size:14.5px;color:#3c4a63;padding-left:26px;position:relative}
+  ul.list li::before{content:"";position:absolute;left:0;top:9px;width:9px;height:9px;border-radius:50%;
+                     background:var(--accent);opacity:.85}
+  ul.list li b{color:#1f2c45}
+
+  .tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin:16px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.8px}
+  th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f8f7fd;font-weight:700;color:#33415c;font-size:12.8px}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fbfaff}
+  td.num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);white-space:nowrap}
+  td.mono code{white-space:nowrap;font-size:12.4px}
+
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .mini{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px}
+  .mini h4{font-size:14.8px;font-weight:700;margin-bottom:8px;color:#2b2545}
+  .mini p{font-size:13.6px;color:var(--muted);margin:0}
+
+  .note{background:#fff8e9;border:1px solid #f6e0b0;border-left:4px solid var(--gold);
+        border-radius:12px;padding:16px 20px;font-size:14px;color:#6b5320;margin:16px 0}
+  .note b{color:#8a6110}
+  .note.warn{background:#fff1f0;border-color:#f7cdc8;border-left-color:#d9534f;color:#7d3b36}
+  .note.warn b{color:#b33b34}
+
+  .tree{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 24px;
+        font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:13.2px;line-height:1.9;color:#38465f;white-space:pre;overflow-x:auto}
+
+  footer{background:#181430;color:#a79ec9;padding:30px 0;font-size:13.4px;margin-top:20px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer a{color:#c8bff0;border-bottom:1px dotted #4d4278}
+  footer a:hover{color:#fff;text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <a class="back" href="../index.html">← 返回合集首页</a>
+    <div class="links">
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels">仓库</a>
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels/releases">下载 exe</a>
+    </div>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="wrap">
+    <img src="src/icon_preview.png" alt="图标">
+    <div>
+      <h1>城市中国综合数据面板</h1>
+      <div class="sub">一个 exe · 一个端口 · 一个门户 —— 平台 7 类数据 + 企业投递简历，装在一起</div>
+      <div>
+        <span class="pill">端口 8795</span>
+        <span class="pill">门户 + 两个内置子面板</span>
+        <span class="pill">配置共享</span>
+        <span class="pill">Windows 单文件 exe</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>这个项目和前两个项目什么关系</h2>
+    <p class="lead">功能没有任何删减，只是把「两个 exe、两个端口、两份配置」变成了「一个 exe、一个端口、一份配置」。</p>
+    <div class="panel">
+      <p>
+        综合面板把 <a href="../city-data-panel/index.html">城市中国平台数据面板</a> 与
+        <a href="../resume-panel/index.html">企业投递简历采集面板</a> 作为两个<b>内置子面板</b>挂在同一个进程里：
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:24%">入口</th><th style="width:30%">等价于</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="mono"><code>/</code></td><td>门户导航页</td><td>两个工具的入口卡片，显示各自配置状态</td></tr>
+            <tr><td class="mono"><code>/city/</code></td><td>平台数据面板</td><td>7 类目全量抓取 + 电话图片 OCR + 简历全量字段补抓</td></tr>
+            <tr><td class="mono"><code>/jd/</code></td><td>企业投递简历采集面板</td><td>企业 → 岗位 → 投递简历 → 完整简历内容</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <b>为什么不用两个 exe 就行？</b>当然可以。但两个独立面板各自要填一遍后台 Cookie、前台 Cookie、保存目录，
+        换台电脑或 Cookie 过期时得改两处。综合面板里这些<b>只填一次</b>，两个子面板实时共享。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>共享配置：一份 config.json 管两个工具</h2>
+    <p class="lead">exe 同目录下的 <code>config.json</code> 是两个子面板共用的同一份文件。</p>
+    <div class="panel">
+      <div class="tbl-wrap" style="margin-top:6px">
+        <table>
+          <thead><tr><th style="width:26%">配置项</th><th style="width:16%">默认</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td class="mono"><code>cookie</code></td><td>—</td><td>后台 Cookie，供 <b>两个</b>子面板的列表类接口使用</td></tr>
+            <tr><td class="mono"><code>front_cookie</code></td><td>—</td><td>前台 Cookie，供 <b>两个</b>子面板抓完整简历内容</td></tr>
+            <tr><td class="mono"><code>save_dir</code></td><td>—</td><td>导出的默认保存目录</td></tr>
+            <tr><td class="mono"><code>ocr_scale</code></td><td>1</td><td>电话图片 OCR 放大倍数（实测 1 最准）</td></tr>
+            <tr><td class="mono"><code>fetch_workers</code></td><td>4</td><td>抓取线程（1–8）</td></tr>
+            <tr><td class="mono"><code>front_rate</code></td><td>1.0</td><td>前台简历请求最小间隔（秒），见下文反爬说明</td></tr>
+            <tr><td class="mono"><code>fetch_resume_detail</code></td><td>1</td><td>平台数据面板：抓简历库时是否顺带补抓完整简历</td></tr>
+            <tr><td class="mono"><code>resume_detail_limit</code></td><td>0</td><td>平台数据面板：详情条数上限，0 = 不限</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        两个子面板共用同一份配置的键空间（各自的默认值与另一方的键完全兼容，读写都是「读盘 → 合并 → 写盘」），
+        所以在 <code>/city/</code> 里保存一次，切到 <code>/jd/</code> 就已经生效，反过来也一样。
+      </p>
+      <p><b>数据分开存放</b>，互不干扰：</p>
+      <div class="tree">综合数据面板/            ← exe 所在目录
+├── config.json            # 两个子面板共享的配置
+├── 数据_平台面板/          # /city/ 的抓取缓存与 OCR 缓存
+│   └── data_cache/
+└── 数据_简历面板/          # /jd/ 的投递数据与状态
+    └── data_cache/</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>⚠️ 反爬限速（务必先读）</h2>
+    <p class="lead">前台简历详情页不能快抓——这是这个工具集里唯一的「硬约束」。</p>
+
+    <div class="note warn">
+      <b>实测现象：</b>前台简历页 <code>/post/qiuzhi/{id}x.html</code> 前方是 nginx WAF。
+      用 8 线程连抓 200 份时，大约<b>第 120 份开始返回带滑动验证的 <code>403</code></b>，
+      页面文案是「疑似异常访问请求，已被系统拦截 / IP频繁访问」；之后<b>本机 IP 被临时拉黑</b>，
+      连原本正常的请求也一起返回 403，几分钟后才恢复。
+    </div>
+
+    <p>
+      对比用户原本的手工脚本（<b>单线程 + 每份 <code>time.sleep(1)</code></b>）长期可用，
+      可以判断瓶颈是<b>请求速率</b>而不是并发数。所以两个子面板的前台简历抓取都内置了限速：
+    </p>
+    <ul class="list">
+      <li><b>全局令牌桶</b>：任意两次前台请求之间强制间隔 <code>front_rate</code> 秒，默认 <code>1.0</code>（≈1 请求/秒）。</li>
+      <li><b>在途并发上限 2</b>：用信号量限制同时打开的连接数，避免多连接同时打到同一 IP。</li>
+      <li><b>命中即熔断</b>：连续 3 次被 WAF 拦截就停止剩余任务，并提示「已自动熔断」。</li>
+      <li><b>断点续抓</b>：已抓到的详情会回写缓存；被拦截后隔几分钟点「只补抓简历库详情」即可接着抓，不重复不丢失。</li>
+      <li><b>反爬识别</b>：响应体里出现「网络安全验证 / 疑似异常访问请求 / IP频繁访问」即判定为拦截，不再把 403 页当成简历内容。</li>
+    </ul>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:30%">规模</th><th style="width:22%">按 1 请求/秒估算</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td>40 份简历详情</td><td class="num">约 1 分钟</td><td>适合先小批量试跑、验证字段解析</td></tr>
+          <tr><td>500 份简历详情</td><td class="num">约 8 分钟</td><td>典型企业投递场景</td></tr>
+          <tr><td>15,733 份（简历库全量）</td><td class="num">约 4–5 小时</td><td>建议分批跑，中途被拦就等几分钟续抓</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <b>不要把「抓取线程」当加速手段。</b>前台速率由「前台请求间隔」决定，线程调到 8 也不会更快，只会更容易触发拦截。
+      真要提速就把「前台请求间隔」调小（例如 <code>0.5</code>），但要自己承担被封 IP 的风险。
+      列表类接口（7 个类目、企业搜索、岗位、投递明细）走后台 <code>job.admin.ccoo.cn</code>，<b>不受此限速影响</b>。
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>使用流程</h2>
+    <div class="grid2">
+      <div class="mini"><h4>① 启动 exe</h4><p>双击 <code>城市中国综合数据面板.exe</code>，控制台会打印三个入口地址并自动打开门户页。</p></div>
+      <div class="mini"><h4>② 进任一子面板填配置</h4><p>进 <code>/city/</code> 或 <code>/jd/</code>，填后台 Cookie、前台 Cookie、保存目录，点「保存配置」。填一次即可。</p></div>
+      <div class="mini"><h4>③ 验证两种 Cookie</h4><p>「测试连接」验后台，「测试前台 Cookie」验前台。前台测试会用一份真实简历探测，返回姓名即通过。</p></div>
+      <div class="mini"><h4>④ 抓取</h4><p><code>/city/</code> 勾选类目抓 7 类数据（简历库可顺带补详情）；<code>/jd/</code> 搜企业后抓投递与完整简历。</p></div>
+      <div class="mini"><h4>⑤ 导出</h4><p><code>/city/</code> 勾选类目导出 xlsx / zip；<code>/jd/</code> 选择「岗位列表 / 投递简历 / 两者都要」导出。</p></div>
+      <div class="mini"><h4>⑥ 换工具不重填</h4><p>切到另一个子面板时，Cookie 与保存目录已经就位，直接开抓即可。</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>三个子项目对比：我该用哪个</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:22%">对比项</th><th style="width:26%">平台数据面板</th><th style="width:26%">企业投递简历采集面板</th><th>综合面板</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>端口</td><td class="num">8787</td><td class="num">8790</td><td class="num">8795</td></tr>
+          <tr><td>exe 数量</td><td>1 个</td><td>1 个</td><td>1 个（含两个工具）</td></tr>
+          <tr><td>7 类目 + OCR</td><td>✅</td><td>—</td><td>✅（<code>/city/</code>）</td></tr>
+          <tr><td>简历库全量字段补抓</td><td>✅</td><td>—</td><td>✅（<code>/city/</code>）</td></tr>
+          <tr><td>企业 → 岗位 → 投递 → 完整简历</td><td>—</td><td>✅</td><td>✅（<code>/jd/</code>）</td></tr>
+          <tr><td>两份配置需分别维护</td><td colspan="2">是（各一份 config.json）</td><td><b>否（共用一份）</b></td></tr>
+          <tr><td>适合场景</td><td>只要平台数据</td><td>只要投递简历</td><td><b>两个都要用</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>目录结构与运行方式</h2>
+    <div class="tree">combined-panel/
+├── index.html                       ← 本说明页
+├── README.md
+└── src/
+    ├── 面板.py                       # 入口：门户 + DispatcherMiddleware 挂载两个子面板
+    ├── panels/
+    │   ├── __init__.py
+    │   ├── city/                     # 平台数据子面板（源自独立项目）
+    │   │   ├── panel.py              #   抓取 + OCR + 简历详情补抓 + 导出
+    │   │   └── static/index.html     #   子面板前端
+    │   └── jd/                       # 企业投递子面板（源自独立项目）
+    │       ├── panel.py
+    │       └── static/index.html
+    ├── resume_front.py               # 前台简历抓取模块（含反爬限速，与独立项目同源）
+    ├── static/
+    │   └── index.html                # 门户首页
+    ├── 打包exe.py                    # 一键 PyInstaller 打包脚本
+    ├── 启动面板.bat                  # 源码启动（双击）
+    ├── 城市中国综合数据面板.spec      # PyInstaller 配置
+    ├── app.ico / icon_preview.png
+    └── config.example.json           # 配置模板（复制为 config.json 后填写）</div>
+
+    <h3>方式一：直接运行 exe（推荐）</h3>
+    <p>到 <a href="https://github.com/chenzhuanxin/hbtc-data-panels/releases">Release 页面</a>下载
+      <code>CombinedPanel-v1.2.0-windows-x64.exe</code>，放到一个单独目录里双击即可。
+      首次运行会在 exe 同目录生成 <code>config.json</code>、<code>数据_平台面板/</code> 与 <code>数据_简历面板/</code>。</p>
+
+    <h3>方式二：源码运行</h3>
+<pre><code># 1) 安装依赖
+pip install flask requests beautifulsoup4 lxml rapidocr_onnxruntime openpyxl onnxruntime
+
+# 2) 准备配置（首次）
+cd src
+copy config.example.json config.json
+#   cookie / front_cookie  = 后台 / 前台 Cookie（两个子面板共用）
+#   fetch_workers          = 抓取线程（1-8，默认 4）
+#   front_rate             = 前台简历请求最小间隔（秒），默认 1.0
+
+# 3) 启动
+python -X utf8 面板.py
+# 门户 http://127.0.0.1:8795/   （平台数据 /city/   企业投递 /jd/）</code></pre>
+
+    <h3>重新打包 exe</h3>
+<pre><code>pip install pyinstaller
+cd src
+python 打包exe.py
+# 产物：dist/城市中国综合数据面板.exe</code></pre>
+
+    <div class="note">
+      <b>注意：</b>exe 体积约 110 MB，是因为把 RapidOCR 的 onnxruntime 与全部模型文件都打了进去。
+      打包命令里显式带了三条 <code>--add-data</code>，把门户页与两个子面板的前端一起塞进包内；
+      子面板通过 <code>DispatcherMiddleware</code> 挂载，各自仍以 <code>/</code> 与 <code>/api/...</code> 的视角工作，互不冲突。
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>常见问题</h2>
+    <div class="panel">
+      <h3>端口 8795 被占用怎么办？</h3>
+      <p>面板会自动顺延到 8796、8797、8798。控制台启动信息里会打印实际端口，以它为准。</p>
+
+      <h3>两个子面板的配置会互相覆盖吗？</h3>
+      <p>不会。两边读的都是「默认值 → 合并磁盘文件」的结果，保存时把合并后的完整对象写回，所以各自的专属键（例如
+        <code>ocr_scale</code>、<code>fetch_resume_detail</code>）会一直保留。共享的是 Cookie、保存目录、线程与限速这些公共项。</p>
+
+      <h3>提示「被站点安全策略拦截」？</h3>
+      <p>前台 IP 被 WAF 临时拉黑了。等几分钟，把「前台请求间隔」调大（例如 1.5 或 2），再点「只补抓简历库详情」续抓即可。
+        已抓到的部分不会丢。</p>
+
+      <h3>简历库抓完了，但没有工作经历 / 教育经历？</h3>
+      <p>前台 Cookie 没配或已过期。列表接口本身不含简历正文，补抓详情必须带前台站点的登录 Cookie。</p>
+
+      <h3>前台 Cookie 测试提示「返回登录页」？</h3>
+      <p>① Cookie 已过期 → 重新登录复制；② 整串很长，可能漏了后半段；③ 粘贴时被换行截断。
+        另外这条 Cookie 串<b>只能用分号 <code>;</code> 切分</b>——<code>ccoo=logintime=…&amp;uid=…</code> 这类 Cookie 的
+        <b>值本身含 <code>&amp;</code></b>，按 <code>&amp;</code> 拆会把它截断，认证随即失效。面板已按正确规则处理，整串粘贴即可。</p>
+
+      <h3>能只跑其中一个子面板吗？</h3>
+      <p>能。不进另一个入口就不会触发它的抓取。想彻底分开用，直接下载对应的独立 exe 即可。</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>城市中国综合数据面板 · 仅供授权账号内部数据整理使用</div>
+    <div>
+      <a href="../index.html">合集首页</a> &nbsp;·&nbsp;
+      <a href="https://github.com/chenzhuanxin/hbtc-data-panels">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

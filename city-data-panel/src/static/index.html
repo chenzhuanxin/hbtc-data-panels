@@ -114,6 +114,8 @@ tbody tr:nth-child(even){background:#fafbfe}
       <button class="ghost" onclick="App.exportConfig()">导出配置(JSON)</button>
       <label class="f">导入配置(JSON)<input type="file" id="importFile" accept=".json" style="font-size:12px"></label>
       <label class="f">OCR放大倍数<input type="text" id="ocrScale" style="width:60px" value="1" title="RapidOCR 建议 1（实测 1 倍最准）"></label>
+      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
+      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="1" title="任意两次前台简历请求之间的最小间隔（秒）。1 ≈ 1 请求/秒；调小会更快但可能被站点安全策略拦截"></label>
       <span id="connMsg" class="msg"></span>
     </div>
   </div>
@@ -197,6 +199,8 @@ const App=(()=>{
     $('#cookie').value=cfg.cookie||''; $('#saveDir').value=cfg.save_dir||'';
     $('#frontCookie').value=cfg.front_cookie||'';
     $('#ocrScale').value=cfg.ocr_scale||1;
+    $('#fetchWorkers').value=cfg.fetch_workers||4;
+    $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?1:cfg.front_rate;
     if($('#withDetail')) $('#withDetail').checked=(cfg.fetch_resume_detail===undefined?true:!!cfg.fetch_resume_detail);
     if($('#detailLimit')) $('#detailLimit').value=cfg.resume_detail_limit||0;
     if(!cfg.front_cookie) flash($('#frontMsg'),'未配置前台 Cookie，简历库将没有完整内容','warn');
@@ -400,6 +404,8 @@ const App=(()=>{
     await jpost('/api/config',{username:$('#username').value,password:$('#password').value,
       cookie:$('#cookie').value,front_cookie:$('#frontCookie').value,
       save_dir:$('#saveDir').value,ocr_scale:parseInt($('#ocrScale').value)||1,
+      fetch_workers:parseInt($('#fetchWorkers').value)||4,
+      front_rate:parseFloat($('#frontRate').value)||1,
       fetch_resume_detail:$('#withDetail')&&$('#withDetail').checked?1:0,
       resume_detail_limit:parseInt($('#detailLimit')&&$('#detailLimit').value)||0});
     flash($('#connMsg'),'已保存','ok');
@@ -420,6 +426,9 @@ const App=(()=>{
       $('#username').value=cfg.username||'';$('#password').value=cfg.password||'';
       $('#cookie').value=cfg.cookie||'';$('#saveDir').value=cfg.save_dir||'';
       $('#ocrScale').value=cfg.ocr_scale||1;
+      $('#frontCookie').value=cfg.front_cookie||'';
+      $('#fetchWorkers').value=cfg.fetch_workers||4;
+      $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?1:cfg.front_rate;
     }catch(err){flash($('#connMsg'),'导入失败：'+err,'err');}
     e.target.value='';
   }

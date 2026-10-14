@@ -143,7 +143,8 @@ JOB_SHEET_HIDDEN = set()
 CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
                   'front_cookie': '',
-                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 8}
+                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 4,
+                  'front_rate': 1.0}               # 前台简历请求最小间隔（秒），1.0=1请求/秒
 
 
 def load_config():
@@ -856,18 +857,28 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
             _prog(detail_total=len(jlids), msg=f'正在抓取 {len(jlids)} 份简历内容…')
             det_map = {}
             need_login = 0
+            waf_block = 0
             fck = CONFIG.get('front_cookie') or ''
 
             if RF.normalize_cookie(fck) and jlids:
+                f_workers = max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
+                try:
+                    f_rate = float(CONFIG.get('front_rate') or 1.0)
+                except (TypeError, ValueError):
+                    f_rate = 1.0
+
                 def onp(done, total, ok, fail):
                     if done % 5 == 0 or done == total:
                         _prog(detail_done=done,
                               msg=f'简历详情 {done}/{total}（成功 {ok} / 失败 {fail}）…')
-                got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp)
+                got, stat = RF.fetch_many(jlids, fck, workers=f_workers, on_progress=onp,
+                                          min_interval=f_rate, max_inflight=2,
+                                          waf_stop_after=3)
                 det_map = {str(k): v for k, v in got.items()}
                 need_login = int(stat.get('need_login') or 0)
+                waf_block = int(stat.get('waf_block') or 0)
                 print(f'[简历详情] 前台抓取 成功 {stat["ok"]} 失败 {stat["fail"]} '
-                      f'需登录 {need_login}')
+                      f'需登录 {need_login} 被拦截 {waf_block}')
 
             # 未取到的（未配置前台 Cookie / Cookie 失效 / 个别失败）用后台页兜底
             miss = [j for j in jlids if str(j) not in det_map]
@@ -893,6 +904,9 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
             if need_login and need_login == len(jlids):
                 _prog(msg=f'⚠ {need_login} 份简历全部返回登录页：前台 Cookie 已失效，'
                           f'请在「连接设置」中更新前台 Cookie 后重抓')
+            elif waf_block:
+                _prog(msg=f'⚠ 有 {waf_block} 份被站点安全策略拦截，已自动熔断停止；'
+                          f'其余部分已改用后台页兜底。IP 解封需要时间，请等十几分钟后再重抓齐全。')
 
         _persist_ocr_cache()
 
@@ -1138,7 +1152,12 @@ def api_config_set():
                 CONFIG[k] = str(d[k] or '')
         if 'fetch_workers' in d:
             try:
-                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
+                CONFIG['fetch_workers'] = max(1, min(8, int(d['fetch_workers'])))
+            except (TypeError, ValueError):
+                pass
+        if 'front_rate' in d:
+            try:
+                CONFIG['front_rate'] = min(5.0, max(0.0, float(d['front_rate'])))
             except (TypeError, ValueError):
                 pass
         if 'ocr_scale' in d:
@@ -1171,7 +1190,12 @@ def api_config_import():
                 CONFIG[k] = str(d[k] or '')
         if 'fetch_workers' in d:
             try:
-                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
+                CONFIG['fetch_workers'] = max(1, min(8, int(d['fetch_workers'])))
+            except (TypeError, ValueError):
+                pass
+        if 'front_rate' in d:
+            try:
+                CONFIG['front_rate'] = min(5.0, max(0.0, float(d['front_rate'])))
             except (TypeError, ValueError):
                 pass
         if 'ocr_scale' in d:

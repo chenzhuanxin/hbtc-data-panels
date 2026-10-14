@@ -11,6 +11,7 @@
     --border:#e4e9f2; --line:#eef2f8;
     --a1:#5B8CFF; --a2:#2A46C8; --accent:#3B6BF0;
     --b1:#25C2A8; --b2:#0E6E9E; --teal:#0F9C8A;
+    --c1:#8B6CF0; --c2:#4A2FA8; --violet:#6D4AE0;
     --gold:#F5A623;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -76,6 +77,7 @@
     background:var(--accent);opacity:.85;
   }
   .card.b .feat li::before{background:var(--teal)}
+  .card.c .feat li::before{background:var(--violet)}
   .card-foot{
     padding:18px 28px 24px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;
   }
@@ -89,6 +91,8 @@
   .btn.primary:hover{filter:brightness(1.08)}
   .btn.teal{background:linear-gradient(135deg,var(--b1),var(--b2));color:#fff;border-color:transparent}
   .btn.teal:hover{filter:brightness(1.08)}
+  .btn.violet{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;border-color:transparent}
+  .btn.violet:hover{filter:brightness(1.08)}
 
   /* ---------- Table ---------- */
   .tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
@@ -126,10 +130,12 @@
 <div class="hero">
   <div class="wrap">
     <div class="badge">城市中国 · 湖北通城网｜招聘频道数据工具</div>
-    <h1>两款采集面板，一套 <span>招聘数据工作流</span></h1>
+    <h1>两套采集面板 + 一个综合版，<span>一套招聘数据工作流</span></h1>
     <p>
-      针对 <strong>城市中国 · 湖北通城网（hbtc.ccoo.cn）</strong> 招聘后台打造的两款本地面板工具：
-      一款把平台 7 大类目数据（含图片电话 OCR 与完整简历字段）整表导出 Excel，一款顺着「企业 → 岗位 → 投递简历 → 完整简历」把投递明细一网打尽。
+      针对 <strong>城市中国 · 湖北通城网（hbtc.ccoo.cn）</strong> 招聘后台打造的本地数据工具：
+      一款把平台 7 大类目数据（含图片电话 OCR 与完整简历字段）整表导出 Excel，
+      一款顺着「企业 → 岗位 → 投递简历 → 完整简历」把投递明细一网打尽，
+      还有一个把两者装进同一个 exe 的<strong>综合面板</strong>（一份配置、一个端口、一个门户）。
       均为 Python + Flask 本地服务 + 浏览器界面，打包为 Windows 单文件 exe，双击即用。
     </p>
     <div class="hero-meta">
@@ -138,14 +144,14 @@
       <span class="chip">简历全量字段</span>
       <span class="chip">Excel / ZIP 导出</span>
       <span class="chip">离线 OCR</span>
-      <span class="chip">并发抓取</span>
+      <span class="chip">反爬限速</span>
     </div>
   </div>
 </div>
 
 <section>
   <div class="wrap">
-    <h2 class="sec-title">两个子项目</h2>
+    <h2 class="sec-title">三个子项目</h2>
     <p class="sec-sub">点击卡片进入各自的详细说明页；可执行文件在 Release 中下载。</p>
 
     <div class="cards">
@@ -172,7 +178,7 @@
         </div>
         <div class="card-foot">
           <a class="btn primary" href="city-data-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.1.0/CityDataPanel-v1.1.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.2.0/CityDataPanel-v1.2.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -197,7 +203,32 @@
         </div>
         <div class="card-foot">
           <a class="btn teal" href="resume-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.1.0/ResumeCollector-v1.1.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.2.0/ResumeCollector-v1.2.0-windows-x64.exe">下载 exe</a>
+        </div>
+      </div>
+
+      <!-- 项目三：综合面板 -->
+      <div class="card c">
+        <div class="card-top">
+          <img src="combined-panel/src/icon_preview.png" alt="综合数据面板图标">
+          <div>
+            <h3>城市中国综合数据面板 <span style="font-size:12.5px;font-weight:700;color:#6D4AE0;background:#f1ecff;border:1px solid #ddd2ff;border-radius:7px;padding:2px 8px;vertical-align:2px">新增</span></h3>
+            <div class="tag">combined-panel ｜ 端口 8795</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>把上面两套工具<strong>装进同一个 exe</strong>：一个门户页 + 两个内置子面板，<strong>一份 config.json 共享配置</strong>，后台 / 前台 Cookie 只填一次。</p>
+          <ul class="feat">
+            <li>一个 exe · 一个端口：门户 <code>/</code>、平台数据 <code>/city/</code>、企业投递 <code>/jd/</code></li>
+            <li>配置共享：两种 Cookie、保存目录、限速参数在两个子面板间实时同步</li>
+            <li>数据分存：<code>数据_平台面板/</code> 与 <code>数据_简历面板/</code> 互不干扰</li>
+            <li>功能与两个独立面板完全一致（7 类目 + OCR + 简历全量字段 / 企业→岗位→投递→完整简历）</li>
+            <li>不想开两个 exe、不想重复填 Cookie 时用它最省事</li>
+          </ul>
+        </div>
+        <div class="card-foot">
+          <a class="btn violet" href="combined-panel/index.html">查看详细说明 →</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.2.0/CombinedPanel-v1.2.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 

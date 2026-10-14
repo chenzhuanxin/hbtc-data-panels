@@ -5,5 +5,6 @@
   "front_cookie": "",
   "save_dir": "",
   "ocr_scale": 1,
-  "fetch_workers": 8
+  "fetch_workers": 4,
+  "front_rate": 1.0
 }

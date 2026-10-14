@@ -322,7 +322,8 @@ UNAVAILABLE = {'账户订单管理': '接口不可用（与订单管理相同数
 CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
                   'front_cookie': '',
-                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 8,
+                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 4,
+                  'front_rate': 1.0,               # 前台简历请求最小间隔（秒），1.0=1请求/秒
                   'fetch_resume_detail': 1,        # 简历库是否补抓前台简历详情
                   'resume_detail_limit': 0}        # 0 = 不限条数
 
@@ -788,21 +789,30 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
     if not jlids:
         return ''
 
-    workers = workers or max(1, min(16, int(CONFIG.get('fetch_workers') or 8)))
+    workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
+    try:
+        rate = float(CONFIG.get('front_rate') or 1.0)
+    except (TypeError, ValueError):
+        rate = 1.0
     total = len(jlids)
-    print(f'[简历详情] 开始抓取 {total} 份（{workers} 线程）…')
+    print(f'[简历详情] 开始抓取 {total} 份（{workers} 线程，间隔 {rate}s ≈ '
+          f'{1.0 / max(rate, 0.01):.1f} 请求/秒，并发上限 2）…')
     _set_progress(cat, msg=f'正在抓取 {total} 份简历详情（前台页）…',
                   detail_done=0, detail_total=total)
 
     def onp(done, tot, ok, fail):
-        if done % 20 == 0 or done == tot:
+        if done % 10 == 0 or done == tot:
             _set_progress(cat, detail_done=done, detail_total=tot,
                           msg=f'简历详情 {done}/{tot}（成功 {ok} / 失败 {fail}）…')
 
     t0 = time.time()
-    got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp)
+    got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp,
+                              min_interval=rate, max_inflight=2,
+                              waf_stop_after=3)
+    el = max(0.1, time.time() - t0)
     print(f'[简历详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
-          f'需登录 {stat["need_login"]}，用时 {int(time.time() - t0)}s')
+          f'需登录 {stat["need_login"]} 被拦截 {stat["waf_block"]}，'
+          f'用时 {int(el)}s（{stat["done"] / el:.2f} 请求/秒）')
 
     add = [c for c in DETAIL_COLS if c not in cols]
     if not add:
@@ -822,8 +832,13 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
     save_cache(cat)
 
     extra = ''
-    if stat.get('need_login'):
+    if stat.get('waf_block'):
+        extra = (f'（{stat["waf_block"]} 份被站点安全策略拦截，已自动熔断停止；'
+                 f'请等十几分钟（期间不要继续请求）后点「只补抓简历库详情」续抓，或把「前台请求间隔」调大）')
+    elif stat.get('need_login'):
         extra = f'（{stat["need_login"]} 份返回登录页，前台 Cookie 可能已失效）'
+    if stat.get('stopped') and not stat.get('waf_block'):
+        extra += '（已提前停止）'
     return (f'；简历详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}'
             f'，新增 {len(add)} 列')
 
@@ -1023,7 +1038,12 @@ def api_config_set():
                 pass
         if 'fetch_workers' in d:
             try:
-                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
+                CONFIG['fetch_workers'] = max(1, min(8, int(d['fetch_workers'])))
+            except (TypeError, ValueError):
+                pass
+        if 'front_rate' in d:
+            try:
+                CONFIG['front_rate'] = min(5.0, max(0.0, float(d['front_rate'])))
             except (TypeError, ValueError):
                 pass
         if 'fetch_resume_detail' in d:

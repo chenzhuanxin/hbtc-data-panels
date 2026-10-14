@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业岗位投递简历采集面板 · 城市中国·湖北通城网</title>
+<style>
+:root{
+  --bg:#f2f5fb; --bg2:#e9eefb; --card:#ffffff; --line:#e4e9f4; --line2:#eef2fa;
+  --txt:#26303f; --sub:#7b879b; --label:#5a6679;
+  --pri:#3a6bf0; --pri2:#5b8bff; --pri-d:#2551cc;
+  --green:#12a05c; --red:#dd4141; --orange:#e58a12; --purple:#7a5af5;
+  --shadow:0 2px 4px rgba(28,44,88,.05), 0 10px 28px rgba(28,44,88,.06);
+  --shadow2:0 4px 10px rgba(28,44,88,.09), 0 18px 40px rgba(28,44,88,.09);
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Microsoft YaHei","PingFang SC",system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(1100px 480px at 12% -8%, #dfe8ff 0%, rgba(223,232,255,0) 62%),
+    radial-gradient(900px 420px at 92% 4%, #e6e0ff 0%, rgba(230,224,255,0) 60%),
+    var(--bg);
+  color:var(--txt); font-size:14px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1400px;margin:0 auto;padding:22px 24px 70px}
+
+/* ============ 顶部 ============ */
+.hero{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  background:linear-gradient(120deg,#3a6bf0 0%,#6a5bf0 52%,#8b5cf6 100%);
+  border-radius:20px;padding:22px 26px;color:#fff;position:relative;overflow:hidden;
+  box-shadow:0 12px 34px rgba(58,107,240,.30);margin-bottom:20px;
+}
+.hero::before{content:"";position:absolute;width:340px;height:340px;right:-90px;top:-160px;
+  background:radial-gradient(circle,rgba(255,255,255,.30),rgba(255,255,255,0) 68%);}
+.hero::after{content:"";position:absolute;width:220px;height:220px;left:26%;bottom:-140px;
+  background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,0) 70%);}
+.hero-l{display:flex;align-items:center;gap:15px;position:relative;z-index:1}
+.logo{width:52px;height:52px;border-radius:15px;background:rgba(255,255,255,.2);
+  border:1px solid rgba(255,255,255,.35);display:grid;place-items:center;font-size:26px;
+  backdrop-filter:blur(6px)}
+.hero h1{font-size:21px;font-weight:700;letter-spacing:.3px;line-height:1.25}
+.hero p{font-size:12.5px;opacity:.88;margin-top:4px;letter-spacing:.2px}
+.hero-r{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hstat{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+  border-radius:11px;padding:9px 15px;text-align:center;min-width:88px;backdrop-filter:blur(6px)}
+.hstat b{display:block;font-size:19px;line-height:1.15}
+.hstat span{font-size:11px;opacity:.85}
+
+/* ============ 步骤条 ============ */
+.steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:18px;
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px 16px;box-shadow:var(--shadow)}
+.step{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--sub);font-weight:600}
+.step i{width:21px;height:21px;border-radius:50%;background:#eef2fb;color:var(--sub);
+  display:grid;place-items:center;font-style:normal;font-size:11.5px;font-weight:700}
+.step.on i{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff}
+.step.on{color:var(--pri-d)}
+.step.done i{background:var(--green);color:#fff}
+.sp{flex:1;min-width:12px;height:2px;background:var(--line2);border-radius:2px;max-width:52px}
+
+/* ============ 卡片 ============ */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow);transition:.2s}
+.card-h{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.card-h .num{width:24px;height:24px;border-radius:8px;flex:none;
+  background:linear-gradient(135deg,#eaf0ff,#f3eeff);color:var(--pri-d);
+  display:grid;place-items:center;font-size:12.5px;font-weight:800}
+.card-h h2{font-size:15px;font-weight:700;letter-spacing:.2px}
+.card-h .hint{font-size:12px;color:var(--sub);font-weight:400}
+.card-h .spacer{flex:1}
+
+/* ============ 控件 ============ */
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row.mt{margin-top:11px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--label);font-weight:600}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13px;outline:none;
+  background:#fbfcff;color:var(--txt);transition:.15s;font-family:inherit}
+input[type=text]:focus,input[type=password]:focus,input[type=number]:focus,select:focus,textarea:focus{
+  border-color:var(--pri);background:#fff;box-shadow:0 0 0 3px rgba(58,107,240,.12)}
+textarea{width:100%;min-height:62px;resize:vertical;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.55}
+button{border:none;border-radius:9px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;
+  background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;transition:.16s;font-family:inherit;
+  box-shadow:0 2px 8px rgba(58,107,240,.24)}
+button:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(58,107,240,.32)}
+button:active{transform:translateY(0)}
+button.ghost{background:#fff;color:var(--pri-d);border:1px solid #cfdcff;box-shadow:none}
+button.ghost:hover{background:#f4f8ff;box-shadow:0 3px 10px rgba(58,107,240,.14)}
+button.gray{background:#eef2f8;color:#5a6679;box-shadow:none}
+button.gray:hover{background:#e4eaf4;box-shadow:none}
+button.mini{padding:5px 11px;font-size:12px;border-radius:7px}
+button:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--label);
+  font-weight:600;cursor:pointer;user-select:none;background:#f7f9ff;border:1px solid var(--line);
+  border-radius:9px;padding:7px 12px}
+.chk input{width:15px;height:15px;cursor:pointer;accent-color:var(--pri)}
+.muted{color:var(--sub);font-size:12px}
+.msg{font-size:12.5px;margin-left:4px;font-weight:600}
+.msg.ok{color:var(--green)} .msg.err{color:var(--red)} .msg.warn{color:var(--orange)}
+
+/* ============ 企业卡片 ============ */
+.clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:11px;margin-top:12px}
+.ccard{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;background:#fbfcff;
+  cursor:pointer;transition:.16s;position:relative}
+.ccard:hover{border-color:#b9ccff;background:#f6f9ff;transform:translateY(-1px);
+  box-shadow:0 6px 18px rgba(58,107,240,.13)}
+.ccard.on{border-color:var(--pri);background:linear-gradient(135deg,#f0f5ff,#f7f3ff);
+  box-shadow:0 0 0 3px rgba(58,107,240,.13)}
+.ccard .cn{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:7px}
+.ccard .meta{margin-top:7px;font-size:11.5px;color:var(--sub);display:flex;flex-wrap:wrap;gap:5px 14px}
+.ccard .uid{margin-top:8px;font-size:11.5px;font-family:Consolas,monospace;color:var(--pri-d);
+  background:#edf3ff;border-radius:6px;padding:3px 8px;display:inline-block;word-break:break-all}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;border-radius:5px;padding:1.5px 7px;
+  background:#eaf0ff;color:var(--pri-d)}
+.tag.g{background:#e6f7ee;color:#0d7a46}
+.tag.o{background:#fff2e0;color:#b96a06}
+.tag.p{background:#f2ecff;color:#6a45e8}
+
+/* ============ 表格 ============ */
+.tw{overflow:auto;max-height:460px;border:1px solid var(--line);border-radius:12px;background:#fff}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--line2);padding:7px 10px;white-space:nowrap;
+  max-width:320px;overflow:hidden;text-overflow:ellipsis;text-align:left}
+th{background:#f5f8ff;position:sticky;top:0;z-index:2;font-weight:700;color:#46536b;
+  border-bottom:1px solid var(--line)}
+tbody tr:nth-child(even){background:#fbfcff}
+tbody tr:hover{background:#f2f7ff}
+tbody tr.sel{background:#eef4ff!important}
+td.num,th.num{text-align:center;width:56px}
+td.link{color:var(--pri);cursor:pointer;text-decoration:underline}
+.pager{display:flex;gap:9px;align-items:center;margin-top:11px;font-size:12.5px;flex-wrap:wrap}
+.pager button{padding:5px 13px;font-size:12px}
+.empty{padding:34px 10px;text-align:center;color:var(--sub);font-size:13px}
+.empty .ico{font-size:34px;display:block;margin-bottom:8px;opacity:.55}
+
+/* ============ 进度 ============ */
+.bar{height:8px;border-radius:5px;background:#e9eefb;margin-top:10px;overflow:hidden;display:none;position:relative}
+.bar>i{display:block;height:100%;width:0;border-radius:5px;
+  background:linear-gradient(90deg,var(--pri),var(--purple));transition:width .35s ease;
+  background-size:200% 100%;animation:flow 1.8s linear infinite}
+@keyframes flow{0%{background-position:0% 0}100%{background-position:200% 0}}
+.bar.err>i{background:var(--red);animation:none}
+.bar.ok>i{background:var(--green);animation:none}
+.pstat{font-size:12.5px;color:var(--sub);margin-top:7px;min-height:17px}
+.pstat b{color:var(--pri-d)}
+
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.stat{background:#f7f9ff;border:1px solid var(--line);border-radius:11px;padding:9px 15px;min-width:104px}
+.stat b{display:block;font-size:17px;color:var(--pri-d);line-height:1.2}
+.stat span{font-size:11.5px;color:var(--sub)}
+
+.filelink{color:var(--pri-d);cursor:pointer;text-decoration:underline;word-break:break-all;font-weight:600}
+.hidden-tip{font-size:11.5px;color:var(--sub)}
+.split{height:1px;background:var(--line2);margin:15px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 顶部 -->
+  <div class="hero">
+    <div class="hero-l">
+      <div class="logo">📑</div>
+      <div>
+        <h1>企业岗位投递简历采集面板</h1>
+        <p>城市中国 · 湖北通城网 · 招聘频道后台 ｜ 企业 → 岗位 → 投递简历 → 简历内容，一键导出 Excel</p>
+      </div>
+    </div>
+    <div class="hero-r">
+      <div class="hstat"><b id="hEnterprise">—</b><span>企业</span></div>
+      <div class="hstat"><b id="hJobs">0</b><span>岗位</span></div>
+      <div class="hstat"><b id="hApps">0</b><span>投递记录</span></div>
+      <div class="hstat"><b id="hRows">0</b><span>导出行</span></div>
+    </div>
+  </div>
+
+  <!-- 步骤条 -->
+  <div class="steps" id="steps">
+    <div class="step" data-s="1"><i>1</i>连接设置</div><div class="sp"></div>
+    <div class="step" data-s="2"><i>2</i>搜索企业</div><div class="sp"></div>
+    <div class="step" data-s="3"><i>3</i>勾选岗位</div><div class="sp"></div>
+    <div class="step" data-s="4"><i>4</i>抓取投递简历</div><div class="sp"></div>
+    <div class="step" data-s="5"><i>5</i>预览 / 导出</div>
+  </div>
+
+  <!-- ① 连接设置 -->
+  <section class="card">
+    <div class="card-h">
+      <span class="num">1</span><h2>连接设置</h2>
+      <span class="hint">账号密码 + 验证码登录，或直接粘贴 Cookie（二选一即可）</span>
+      <span class="spacer"></span>
+      <span id="connMsg" class="msg"></span>
+    </div>
+    <div class="row">
+      <label class="f">账号<input type="text" id="username" style="width:190px" placeholder="hbtongchengccoo"></label>
+      <label class="f">密码<input type="password" id="password" style="width:190px" placeholder="••••••••"></label>
+      <label class="f">验证码
+        <span class="row" style="gap:7px">
+          <input type="text" id="code" style="width:88px" placeholder="区分大小写">
+          <img id="captchaImg" style="height:36px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff"
+               title="点击刷新验证码" onclick="App.refreshCaptcha()">
+        </span>
+      </label>
+      <label class="f">&nbsp;<button class="ghost" onclick="App.doLogin()">验证码登录</button></label>
+    </div>
+    <label class="f" style="width:100%;margin-top:12px">Cookie（分号分隔，从浏览器登录后台后复制）</label>
+    <textarea id="cookie" placeholder="ccoocitycrm=...; ASP.NET_SessionId=...; siteid="></textarea>
+
+    <label class="f" style="width:100%;margin-top:14px">
+      前台 Cookie
+      <b style="color:#e0552b">（抓取完整简历内容必需）</b>
+    </label>
+    <textarea id="frontCookie" placeholder="登录 www.hbtc.ccoo.cn 后复制：PHPSESSID=...; ccoo=logintime=...&amp;uid=...; siteid=880; sitename=..."></textarea>
+    <div class="row" style="margin-top:8px;gap:10px;align-items:center">
+      <button class="ghost" onclick="App.testFrontCookie()">测试前台 Cookie</button>
+      <span id="frontMsg" class="msg"></span>
+      <span class="muted">
+        完整简历内容（工作经历 1-10 / 教育经历 / 语言能力 / 获得证书 / 职位类别 / 现居地）
+        只能从前台简历页 <code>/post/qiuzhi/{jlid}x.html</code> 取得，该页需要前台登录 Cookie。
+        不填则简历详情退化为后台页的部分字段。
+      </span>
+    </div>
+    <div class="row mt" style="gap:14px">
+      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
+      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="1" title="任意两次前台简历请求之间的最小间隔（秒）。1 ≈ 1 请求/秒，与站点可承受速率一致；调小会更快但可能被站点安全策略拦截"></label>
+      <span class="muted">站点有反爬：间隔越大越安全，调大线程不会更快</span>
+    </div>
+    <div class="row mt">
+      <button onclick="App.saveConfig()">保存配置</button>
+      <button class="ghost" onclick="App.testCookie()">测试连接</button>
+      <button class="ghost" onclick="App.exportConfig()">导出配置(JSON)</button>
+      <label class="f">导入配置(JSON)<input type="file" id="importFile" accept=".json" style="font-size:12px"></label>
+      <span class="spacer"></span>
+      <span class="muted">Cookie 保存在本目录 config.json，导入导出便于换电脑使用</span>
+    </div>
+  </section>
+
+  <!-- ② 搜索企业 -->
+  <section class="card">
+    <div class="card-h">
+      <span class="num">2</span><h2>搜索企业</h2>
+      <span class="hint">支持模糊匹配，例如输入「宝顺」即可匹配到「湖北宝顺物流有限公司」</span>
+    </div>
+    <div class="row">
+      <input type="text" id="kw" style="width:340px" placeholder="输入企业名称关键字…"
+             onkeydown="if(event.key==='Enter')App.searchCompany()">
+      <button onclick="App.searchCompany()">🔍 搜索企业</button>
+      <span id="searchMsg" class="msg"></span>
+    </div>
+    <div id="companyList" class="clist"></div>
+    <div id="companyEmpty" class="empty" style="display:none">
+      <span class="ico">🏢</span>没有匹配到企业，换个关键字试试
+    </div>
+  </section>
+
+  <!-- ③ 岗位列表 -->
+  <section class="card">
+    <div class="card-h">
+      <span class="num">3</span><h2>岗位列表</h2>
+      <span id="jobCompany" class="hint"></span>
+      <span class="spacer"></span>
+      <label class="chk"><input type="checkbox" id="jAll" onchange="App.toggleAllJobs(this.checked)">全选</label>
+      <button class="ghost mini" onclick="App.selectJobSet('applied')">只选有投递的</button>
+      <button class="ghost mini" onclick="App.selectJobSet('none')">全不选</button>
+      <button class="ghost mini" onclick="App.selectJobSet('invert')">反选</button>
+      <span id="jobCount" class="muted"></span>
+    </div>
+    <div class="tw" id="jobWrap"><div class="empty"><span class="ico">💼</span>请先在上一步搜索并选择一家企业</div></div>
+  </section>
+
+  <!-- ④ 抓取 -->
+  <section class="card">
+    <div class="card-h">
+      <span class="num">4</span><h2>抓取投递简历</h2>
+      <span class="hint">自动翻页抓取每个岗位收到的简历，并逐份解析简历内容（姓名/电话/经历等）</span>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="optDetail" checked>抓取简历详细内容</label>
+      <label class="chk"><input type="checkbox" id="optOcr" checked>电话图片自动 OCR</label>
+      <label class="f">每个岗位最多抓几页<input type="number" id="optPages" value="0" min="0" style="width:92px" title="0 = 不限，抓取全部"></label>
+      <span class="muted">0 = 全部</span>
+      <button onclick="App.startFetch()">🚀 开始抓取</button>
+      <button class="gray" onclick="App.clearAll()">清空当前数据</button>
+    </div>
+    <div class="bar" id="fBar"><i></i></div>
+    <div class="pstat" id="fStat"></div>
+    <div class="stats" id="fStats" style="display:none">
+      <div class="stat"><b id="sJob">0</b><span>已抓岗位</span></div>
+      <div class="stat"><b id="sApps">0</b><span>投递记录</span></div>
+      <div class="stat"><b id="sDet">0</b><span>简历详情</span></div>
+    </div>
+  </section>
+
+  <!-- ⑤ 预览 / 导出 -->
+  <section class="card">
+    <div class="card-h">
+      <span class="num">5</span><h2>数据预览 与 导出</h2>
+      <span class="spacer"></span>
+      <input type="text" id="dKw" style="width:220px" placeholder="关键字过滤…"
+             onkeydown="if(event.key==='Enter')App.loadData(1)">
+      <button class="ghost mini" onclick="App.loadData(1)">过滤</button>
+      <label class="chk"><input type="checkbox" id="showAll" onchange="App.loadData(1)">显示全部字段</label>
+      <button class="ghost mini" onclick="App.loadData(curPage)">刷新</button>
+    </div>
+
+    <div class="tw" id="dataWrap"><div class="empty"><span class="ico">📊</span>暂无数据，请先抓取投递简历</div></div>
+    <div class="pager" id="pager" style="display:none">
+      <button class="ghost" onclick="App.page(-1)">上一页</button>
+      <span id="pageInfo" class="muted"></span>
+      <button class="ghost" onclick="App.page(1)">下一页</button>
+      <span class="spacer" style="flex:1"></span>
+      <span id="fieldTip" class="hidden-tip"></span>
+    </div>
+
+    <div class="split"></div>
+
+    <div class="row">
+      <label class="f" style="flex:1;min-width:320px">Excel 保存目录
+        <span class="row" style="gap:8px">
+          <input type="text" id="saveDir" style="flex:1;min-width:240px" placeholder="点右侧按钮选择目录…">
+          <button class="ghost" onclick="App.pickDir()">📁 选择目录…</button>
+        </span>
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:10px;gap:14px;align-items:center;flex-wrap:wrap">
+      <span class="muted">导出内容</span>
+      <label class="chk"><input type="checkbox" id="shApps" checked>投递简历</label>
+      <label class="chk"><input type="checkbox" id="shJobs" checked>岗位列表</label>
+      <span class="muted" style="opacity:.75">｜快捷：</span>
+      <button class="ghost mini" onclick="App.sheetPreset('all')">两个都要</button>
+      <button class="ghost mini" onclick="App.sheetPreset('apps')">只导投递简历</button>
+      <button class="ghost mini" onclick="App.sheetPreset('jobs')">只导岗位列表</button>
+      <span class="spacer" style="flex:1"></span>
+      <button onclick="App.doExport()">📥 导出 Excel</button>
+      <span id="exportMsg" class="msg"></span>
+    </div>
+    <div class="bar" id="eBar"><i></i></div>
+    <div class="pstat" id="eStat"></div>
+    <div id="exportResult" style="margin-top:9px;font-size:13px"></div>
+    <p class="muted" style="margin-top:10px">
+      勾选要导出的内容，可<b>单独导出「岗位列表」</b>，也可两个一起导出（一个 Excel 含两个工作表）。
+      <b>「投递简历」</b>=每条投递一行（含简历内容与简历链接）；<b>「岗位列表」</b>=该企业全部岗位（岗位名称 / 链接 / 投递简历数 / 发布时间）。
+      文件名自动生成，无需手动输入；次要字段（头像/照片/工作经历7+ /教育经历3+ /语言能力2+ /证书3+）默认隐藏但保留，可在 Excel 中取消隐藏查看。
+      <b>简历内容取自前台简历详情页</b>（需在①中配置前台 Cookie），工作经历最多 10 段、教育经历 5 段、语言能力 5 项、获得证书 5 项。
+    </p>
+  </section>
+
+</div>
+
+<script>
+const App = (() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  let JOBS = [], SELJ = new Set(), COMPANY = null, APPLIED = new Set();
+  let ALLCOLS = [], HIDDEN = new Set(), curPage = 1, curSize = 50, TOTAL = 0;
+  let fTimer = null, eTimer = null;
+
+  async function jget(u){ const r = await fetch(u); return r.json(); }
+  async function jpost(u,d){
+    const r = await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d||{})});
+    return r.json();
+  }
+  function msg(el, text, cls){ el.textContent = text; el.className = 'msg ' + (cls||''); }
+  function setStep(n, total){
+    $$('#steps .step').forEach(e => {
+      const s = +e.dataset.s;
+      e.classList.toggle('done', s < n);
+      e.classList.toggle('on', s === n);
+    });
+  }
+  function showBar(el, show){ el.style.display = show ? 'block' : 'none'; }
+  function setBar(el, pct, cls){
+    showBar(el, true);
+    el.className = 'bar ' + (cls||'');
+    el.firstElementChild.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  // ---------------- 配置 ----------------
+  async function init(){
+    const c = await jget('/jd/api/config');
+    $('#username').value = c.username || '';
+    $('#password').value = c.password || '';
+    $('#cookie').value = c.cookie || '';
+    $('#frontCookie').value = c.front_cookie || '';
+    $('#saveDir').value = c.save_dir || '';
+    $('#fetchWorkers').value = c.fetch_workers || 4;
+    $('#frontRate').value = (c.front_rate === undefined || c.front_rate === null) ? 1 : c.front_rate;
+    if (c.cookie) msg($('#connMsg'), '已载入已保存的 Cookie', 'ok');
+    if (!c.front_cookie) msg($('#frontMsg'), '未配置前台 Cookie，简历详情将不完整', 'warn');
+    $('#importFile').addEventListener('change', importConfig);
+    await refreshState();
+    setStep(1);
+  }
+  async function saveConfig(){
+    await jpost('/jd/api/config', {
+      username: $('#username').value, password: $('#password').value,
+      cookie: $('#cookie').value, front_cookie: $('#frontCookie').value,
+      save_dir: $('#saveDir').value,
+      fetch_workers: parseInt($('#fetchWorkers').value) || 4,
+      front_rate: parseFloat($('#frontRate').value) || 1
+    });
+    msg($('#connMsg'), '✔ 配置已保存到 config.json', 'ok');
+  }
+  async function testFrontCookie(){
+    msg($('#frontMsg'), '正在测试前台 Cookie…', 'warn');
+    const r = await jpost('/jd/api/front_test', { front_cookie: $('#frontCookie').value });
+    msg($('#frontMsg'), (r.ok ? '✔ ' : '✘ ') + r.msg, r.ok ? 'ok' : 'err');
+  }
+  async function testCookie(){
+    msg($('#connMsg'), '正在测试…', 'warn');
+    await saveConfig();
+    const r = await jpost('/jd/api/test_cookie', {});
+    msg($('#connMsg'), (r.ok ? '✔ ' : '✘ ') + r.msg, r.ok ? 'ok' : 'err');
+    if (r.ok) setStep(2);
+  }
+  function exportConfig(){ window.location.href = '/jd/api/config/export'; }
+  async function importConfig(e){
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const txt = await f.text();
+      const r = await jpost('/jd/api/config/import', JSON.parse(txt));
+      msg($('#connMsg'), r.ok ? '✔ 配置导入成功' : '✘ ' + r.msg, r.ok ? 'ok' : 'err');
+      if (r.ok) await init();
+    } catch (err) { msg($('#connMsg'), '✘ JSON 解析失败：' + err.message, 'err'); }
+    e.target.value = '';
+  }
+  async function refreshCaptcha(){
+    const r = await jpost('/jd/api/captcha', {});
+    if (r.ok) $('#captchaImg').src = r.image;
+    else msg($('#connMsg'), '获取验证码失败：' + r.msg, 'err');
+  }
+  async function doLogin(){
+    msg($('#connMsg'), '正在登录…', 'warn');
+    const r = await jpost('/jd/api/login', {
+      username: $('#username').value, password: $('#password').value, code: $('#code').value
+    });
+    msg($('#connMsg'), (r.ok ? '✔ ' : '✘ ') + r.msg, r.ok ? 'ok' : 'err');
+    if (r.ok) { $('#cookie').value = r.cookie; setStep(2); }
+  }
+
+  // ---------------- 状态 ----------------
+  async function refreshState(){
+    const s = await jget('/jd/api/state');
+    COMPANY = s.company;
+    $('#hEnterprise').textContent = (s.company && s.company.CompName) ? s.company.CompName.slice(0,7) : '—';
+    $('#hJobs').textContent = (s.jobs || []).length;
+    $('#hApps').textContent = s.apps || 0;
+    $('#hRows').textContent = s.rows || 0;
+    if (s.company && (s.jobs || []).length){
+      $('#jobCompany').textContent = '企业：' + s.company.CompName + '（' + (s.company.username||'') + '）';
+      APPLIED = new Set((s.jobs||[]).filter(j => (j.countjl||0) > 0).map(j => String(j.id)));
+      JOBS = s.jobs || [];
+      SELJ = new Set(APPLIED);
+      renderJobs(true);
+    }
+    if (s.rows) { await loadData(1); setStep(5); }
+  }
+
+  // ---------------- 企业搜索 ----------------
+  async function searchCompany(){
+    const kw = $('#kw').value.trim();
+    if (!kw) { msg($('#searchMsg'), '请输入企业名称', 'err'); return; }
+    msg($('#searchMsg'), '搜索中…', 'warn');
+    const r = await jpost('/jd/api/search_company', { keyword: kw });
+    if (!r.ok){ msg($('#searchMsg'), '✘ ' + r.msg, 'err'); return; }
+    msg($('#searchMsg'), '找到 ' + r.count + ' 家企业' + (r.count > r.list.length ? '（显示前 ' + r.list.length + ' 家）' : ''), 'ok');
+    const box = $('#companyList');
+    box.innerHTML = '';
+    $('#companyEmpty').style.display = r.list.length ? 'none' : 'block';
+    r.list.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'ccard';
+      d.dataset.uid = c.username;
+      d.innerHTML =
+        '<div class="cn">' + esc(c.CompName) +
+          (c.VipType ? ' <span class="tag o">VIP</span>' : '') + '</div>' +
+        '<div class="meta">' +
+          '<span>📍 ' + esc(c.AreaStr || '—') + '</span>' +
+          '<span>💼 岗位 ' + (c.jobCount == null ? '—' : c.jobCount) + '</span>' +
+          '<span>🕒 ' + esc(c.SysTime || '—') + '</span>' +
+        '</div>' +
+        '<div class="uid">' + esc(c.username || '（无用户名）') + '</div>';
+      d.onclick = () => selectCompany(c, d);
+      box.appendChild(d);
+    });
+    if (r.list.length) selectCompany(r.list[0], box.firstElementChild);
+    setStep(3);
+  }
+  async function selectCompany(c, el){
+    $$('#companyList .ccard').forEach(e => e.classList.remove('on'));
+    if (el) el.classList.add('on');
+    COMPANY = c;
+    $('#jobCompany').textContent = '企业：' + c.CompName + '（' + c.username + '）';
+    await loadJobs(c);
+  }
+  async function loadJobs(c){
+    $('#jobWrap').innerHTML = '<div class="empty"><span class="ico">⏳</span>正在获取岗位列表…</div>';
+    const r = await jpost('/jd/api/company_jobs', { username: c.username, company: c, include_parttime: true });
+    if (!r.ok){ $('#jobWrap').innerHTML = '<div class="empty"><span class="ico">⚠️</span>' + esc(r.msg) + '</div>'; return; }
+    JOBS = r.jobs || [];
+    APPLIED = new Set(JOBS.filter(j => (j.countjl||0) > 0).map(j => String(j.id)));
+    SELJ = new Set(APPLIED);            // 默认勾选「有投递」的岗位
+    renderJobs();
+    $('#hJobs').textContent = JOBS.length;
+  }
+  function renderJobs(keep){
+    if (!JOBS.length){
+      $('#jobWrap').innerHTML = '<div class="empty"><span class="ico">💼</span>该企业暂无岗位</div>';
+      $('#jobCount').textContent = ''; return;
+    }
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th class="num"><input type="checkbox" id="jHead"></th>' +
+      '<th>类型</th><th>岗位ID</th><th>岗位名称</th><th>投递简历</th><th>发布时间</th><th>岗位链接</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    JOBS.forEach(j => {
+      const tr = document.createElement('tr');
+      const id = String(j.id);
+      if (SELJ.has(id)) tr.classList.add('sel');
+      tr.innerHTML =
+        '<td class="num"><input type="checkbox" data-id="' + esc(id) + '"' + (SELJ.has(id) ? ' checked' : '') + '></td>' +
+        '<td><span class="tag ' + (j.type === '兼职' ? 'p' : '') + '">' + esc(j.type) + '</span></td>' +
+        '<td>' + esc(id) + '</td>' +
+        '<td title="' + esc(j.title) + '">' + esc(j.title) + '</td>' +
+        '<td><span class="tag ' + ((j.countjl||0) > 0 ? 'g' : '') + '">' + (j.countjl || 0) + '</span></td>' +
+        '<td>' + esc(j.systime || '—') + '</td>' +
+        '<td class="link" data-link="' + esc(j.link) + '">' + esc(j.link) + '</td>';
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    const w = $('#jobWrap'); w.innerHTML = ''; w.appendChild(t);
+    w.querySelectorAll('tbody input[type=checkbox]').forEach(cb => {
+      cb.onchange = () => {
+        const id = cb.dataset.id;
+        if (cb.checked) SELJ.add(id); else SELJ.delete(id);
+        cb.closest('tr').classList.toggle('sel', cb.checked);
+        syncJobUI();
+      };
+    });
+    w.querySelectorAll('td.link').forEach(td => td.onclick = () => window.open(td.dataset.link, '_blank'));
+    const h = $('#jHead');
+    if (h) h.onchange = () => toggleAllJobs(h.checked);
+    syncJobUI();
+  }
+  function syncJobUI(){
+    const n = SELJ.size;
+    const total = JOBS.filter(j => SELJ.has(String(j.id))).reduce((a,b) => a + (b.countjl||0), 0);
+    $('#jobCount').textContent = '已选 ' + n + ' / ' + JOBS.length + ' 个岗位，预计 ' + total + ' 条投递记录';
+    const h = $('#jHead');
+    if (h){
+      h.checked = n > 0 && n === JOBS.length;
+      h.indeterminate = n > 0 && n < JOBS.length;
+    }
+  }
+  function toggleAllJobs(on){
+    SELJ = on ? new Set(JOBS.map(j => String(j.id))) : new Set();
+    renderJobs(true);
+  }
+  function selectJobSet(mode){
+    if (mode === 'applied') SELJ = new Set(JOBS.filter(j => APPLIED.has(String(j.id))).map(j => String(j.id)));
+    else if (mode === 'none') SELJ = new Set();
+    else if (mode === 'invert') SELJ = new Set(JOBS.map(j => String(j.id)).filter(id => !SELJ.has(id)));
+    renderJobs(true);
+  }
+
+  // ---------------- 抓取 ----------------
+  async function startFetch(){
+    if (!SELJ.size){ alert('请先勾选至少一个岗位'); return; }
+    await saveConfig();
+    const jobs = JOBS.filter(j => SELJ.has(String(j.id)));
+    const r = await jpost('/jd/api/fetch', {
+      jobs: jobs, company: COMPANY,
+      fetch_detail: $('#optDetail').checked,
+      use_ocr: $('#optOcr').checked,
+      max_pages: parseInt($('#optPages').value || '0', 10)
+    });
+    if (!r.ok){ msg($('#fStat'), '✘ ' + r.msg, 'err'); return; }
+    setBar($('#fBar'), 4);
+    $('#fStats').style.display = 'flex';
+    msg($('#fStat'), '已提交，正在抓取…', 'warn');
+    if (fTimer) clearInterval(fTimer);
+    fTimer = setInterval(pollProgress, 1200);
+  }
+  async function pollProgress(){
+    const p = await jget('/jd/api/progress');
+    $('#sJob').textContent = (p.job_done||0) + ' / ' + (p.job_total||0);
+    $('#sApps').textContent = p.apps || 0;
+    $('#sDet').textContent = (p.detail_done||0) + ' / ' + (p.detail_total||0);
+    let pct = 0;
+    if (p.job_total) pct = (p.job_done / p.job_total) * (p.detail_total ? 55 : 100);
+    if (p.detail_total) pct += (p.detail_done / p.detail_total) * 45;
+    if (p.phase === 'done'){
+      setBar($('#fBar'), 100, 'ok');
+      msg($('#fStat'), '✔ ' + p.msg, 'ok');
+      clearInterval(fTimer); fTimer = null;
+      await refreshState(); await loadData(1); setStep(5);
+    } else if (p.phase === 'error'){
+      setBar($('#fBar'), 100, 'err');
+      msg($('#fStat'), '✘ ' + p.msg, 'err');
+      clearInterval(fTimer); fTimer = null;
+    } else {
+      setBar($('#fBar'), pct);
+      msg($('#fStat'), p.msg || '抓取中…', 'warn');
+    }
+  }
+  async function clearAll(){
+    if (!confirm('确定清空当前企业的抓取数据？（配置文件与 Cookie 不受影响）')) return;
+    await jpost('/jd/api/clear', {});
+    JOBS = []; SELJ = new Set(); COMPANY = null;
+    $('#jobWrap').innerHTML = '<div class="empty"><span class="ico">💼</span>请先在上一步搜索并选择一家企业</div>';
+    $('#dataWrap').innerHTML = '<div class="empty"><span class="ico">📊</span>暂无数据，请先抓取投递简历</div>';
+    $('#pager').style.display = 'none';
+    await refreshState();
+  }
+
+  // ---------------- 数据预览 ----------------
+  async function loadData(page){
+    curPage = Math.max(1, page || 1);
+    const all = $('#showAll').checked;
+    const kw = $('#dKw').value.trim();
+    const d = await jget('/jd/api/data?page=' + curPage + '&size=' + curSize + '&kw=' + encodeURIComponent(kw));
+    ALLCOLS = d.cols || []; HIDDEN = new Set(d.hidden || []); TOTAL = d.total || 0;
+    const cols = all ? ALLCOLS : ALLCOLS.filter(c => !HIDDEN.has(c));
+    const w = $('#dataWrap');
+    if (!d.rows || !d.rows.length){
+      w.innerHTML = '<div class="empty"><span class="ico">📊</span>' + (TOTAL ? '没有匹配的数据' : '暂无数据，请先抓取投递简历') + '</div>';
+      $('#pager').style.display = 'none';
+      $('#hRows').textContent = TOTAL;
+      return;
+    }
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead>';
+    const tb = document.createElement('tbody');
+    d.rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = cols.map(c => {
+        const v = r[c];
+        if (c === '简历链接' || c === '岗位链接'){
+          const s = String(v || '');
+          return '<td class="link" data-link="' + esc(s) + '" title="' + esc(s) + '">' + esc(s) + '</td>';
+        }
+        const s = String(v == null ? '' : v);
+        return '<td title="' + esc(s) + '">' + esc(s) + '</td>';
+      }).join('');
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    w.innerHTML = ''; w.appendChild(t);
+    w.querySelectorAll('td.link').forEach(td => td.onclick = () => window.open(td.dataset.link, '_blank'));
+
+    const pages = Math.max(1, Math.ceil(TOTAL / curSize));
+    $('#pager').style.display = 'flex';
+    $('#pageInfo').textContent = '第 ' + curPage + ' / ' + pages + ' 页 ｜ 共 ' + TOTAL + ' 行';
+    $('#fieldTip').textContent = '当前显示 ' + cols.length + ' / ' + ALLCOLS.length + ' 列'
+      + (all ? '' : '（已隐藏 ' + (ALLCOLS.length - cols.length) + ' 个次要字段）');
+    $('#hRows').textContent = TOTAL;
+  }
+  function page(d){
+    const pages = Math.max(1, Math.ceil(TOTAL / curSize));
+    const n = Math.min(pages, Math.max(1, curPage + d));
+    if (n !== curPage) loadData(n);
+  }
+
+  // ---------------- 导出 ----------------
+  async function pickDir(){
+    msg($('#exportMsg'), '等待选择目录…', 'warn');
+    const r = await jpost('/jd/api/pick_dir', { init: $('#saveDir').value });
+    if (r.ok){ $('#saveDir').value = r.dir; msg($('#exportMsg'), '✔ 已选择目录', 'ok'); }
+    else msg($('#exportMsg'), r.msg || '已取消', 'warn');
+  }
+  function sheetPreset(kind){
+    $('#shApps').checked = (kind === 'all' || kind === 'apps');
+    $('#shJobs').checked = (kind === 'all' || kind === 'jobs');
+    msg($('#exportMsg'), kind === 'jobs' ? '已选：只导岗位列表'
+      : kind === 'apps' ? '已选：只导投递简历' : '已选：两个工作表', 'ok');
+  }
+  function pickedSheets(){
+    const s = [];
+    if ($('#shApps').checked) s.push('apps');
+    if ($('#shJobs').checked) s.push('jobs');
+    return s;
+  }
+  async function doExport(){
+    const sheets = pickedSheets();
+    if (!sheets.length){ alert('请至少勾选一项导出内容（投递简历 / 岗位列表）'); return; }
+    if (sheets.includes('apps') && TOTAL === 0){
+      alert('还没有投递简历数据，请先抓取，或取消勾选「投递简历」'); return;
+    }
+    if (sheets.includes('jobs') && !JOBS.length){ alert('还没有岗位数据，请先搜索企业获取岗位列表'); return; }
+    if (!$('#saveDir').value){ alert('请先选择 Excel 保存目录'); return; }
+    await saveConfig();
+    const r = await jpost('/jd/api/export', { dir: $('#saveDir').value, sheets: sheets });
+    if (!r.ok){ msg($('#exportMsg'), '✘ ' + r.msg, 'err'); return; }
+    setBar($('#eBar'), 8);
+    msg($('#exportMsg'), '正在导出…', 'warn');
+    $('#exportResult').innerHTML = '';
+    if (eTimer) clearInterval(eTimer);
+    eTimer = setInterval(pollExport, 700);
+  }
+  async function pollExport(){
+    const p = await jget('/jd/api/export_progress');
+    if (p.phase === 'running'){
+      setBar($('#eBar'), p.total ? Math.min(96, 15 + (p.written / p.total) * 80) : 30);
+      msg($('#eStat'), p.msg || '导出中…', 'warn');
+    } else if (p.phase === 'done'){
+      setBar($('#eBar'), 100, 'ok');
+      msg($('#eStat'), '✔ ' + p.msg, 'ok');
+      const f = p.file || '';
+      $('#exportResult').innerHTML = '文件：<span class="filelink" onclick="App.openPath(\'' +
+        f.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')">' + esc(f) + '</span>' +
+        ' <button class="ghost mini" style="margin-left:9px" onclick="App.openPath(\'' +
+        f.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')">打开所在文件夹</button>';
+      clearInterval(eTimer); eTimer = null;
+      msg($('#exportMsg'), '', '');
+    } else if (p.phase === 'error'){
+      setBar($('#eBar'), 100, 'err');
+      msg($('#eStat'), '✘ ' + p.msg, 'err');
+      clearInterval(eTimer); eTimer = null;
+    }
+  }
+  async function openPath(p){ await jpost('/jd/api/open_path', { path: p }); }
+
+  const api = { init, saveConfig, testCookie, testFrontCookie, exportConfig, refreshCaptcha, doLogin,
+    searchCompany, toggleAllJobs, selectJobSet, startFetch, clearAll,
+    loadData, page, pickDir, doExport, sheetPreset, openPath, pollProgress, pollExport };
+  return api;
+})();
+window.App = App;
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+
+<div style="position:fixed;left:14px;bottom:14px;z-index:9999">
+  <a href="/" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;
+     padding:8px 14px;border-radius:999px;background:#1b2a4a;color:#dbe6fa;
+     text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:.92"
+     onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.92">
+    &#8592; 综合面板首页</a>
+</div>
+</body>
+</html>

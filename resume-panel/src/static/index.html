@@ -222,6 +222,11 @@ td.link{color:var(--pri);cursor:pointer;text-decoration:underline}
         不填则简历详情退化为后台页的部分字段。
       </span>
     </div>
+    <div class="row mt" style="gap:14px">
+      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
+      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="1" title="任意两次前台简历请求之间的最小间隔（秒）。1 ≈ 1 请求/秒；调小会更快但可能被站点安全策略拦截"></label>
+      <span class="muted">站点有反爬：间隔越大越安全，调大线程不会更快</span>
+    </div>
     <div class="row mt">
       <button onclick="App.saveConfig()">保存配置</button>
       <button class="ghost" onclick="App.testCookie()">测试连接</button>
@@ -383,6 +388,8 @@ const App = (() => {
     $('#cookie').value = c.cookie || '';
     $('#frontCookie').value = c.front_cookie || '';
     $('#saveDir').value = c.save_dir || '';
+    $('#fetchWorkers').value = c.fetch_workers || 4;
+    $('#frontRate').value = (c.front_rate === undefined || c.front_rate === null) ? 1 : c.front_rate;
     if (c.cookie) msg($('#connMsg'), '已载入已保存的 Cookie', 'ok');
     if (!c.front_cookie) msg($('#frontMsg'), '未配置前台 Cookie，简历详情将不完整', 'warn');
     $('#importFile').addEventListener('change', importConfig);
@@ -393,7 +400,9 @@ const App = (() => {
     await jpost('/api/config', {
       username: $('#username').value, password: $('#password').value,
       cookie: $('#cookie').value, front_cookie: $('#frontCookie').value,
-      save_dir: $('#saveDir').value
+      save_dir: $('#saveDir').value,
+      fetch_workers: parseInt($('#fetchWorkers').value) || 4,
+      front_rate: parseFloat($('#frontRate').value) || 1
     });
     msg($('#connMsg'), '✔ 配置已保存到 config.json', 'ok');
   }
