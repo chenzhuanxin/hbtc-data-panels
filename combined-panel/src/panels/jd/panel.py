@@ -873,12 +873,14 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
                               msg=f'简历详情 {done}/{total}（成功 {ok} / 失败 {fail}）…')
                 got, stat = RF.fetch_many(jlids, fck, workers=f_workers, on_progress=onp,
                                           min_interval=f_rate, max_inflight=2,
-                                          waf_stop_after=3)
+                                          waf_stop_after=3, retry_rounds=2,
+                                          retry_delay=8.0)
                 det_map = {str(k): v for k, v in got.items()}
                 need_login = int(stat.get('need_login') or 0)
                 waf_block = int(stat.get('waf_block') or 0)
                 print(f'[简历详情] 前台抓取 成功 {stat["ok"]} 失败 {stat["fail"]} '
-                      f'需登录 {need_login} 被拦截 {waf_block}')
+                      f'需登录 {need_login} 被拦截 {waf_block} '
+                      f'（{stat.get("rounds")} 轮）')
 
             # 未取到的（未配置前台 Cookie / Cookie 失效 / 个别失败）用后台页兜底
             miss = [j for j in jlids if str(j) not in det_map]

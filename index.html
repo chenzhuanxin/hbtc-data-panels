@@ -151,6 +151,35 @@
 
 <section>
   <div class="wrap">
+    <h2 class="sec-title">v1.3.0：简历「全量」问题已修复</h2>
+    <p class="sec-sub">如果你之前导出的简历表后半段是空的，看这里。</p>
+    <div class="step" style="border-left:4px solid #d9534f;background:#fff8f7">
+      <h4 style="color:#b33b34">问题：8 线程快抓 200 份，只成功了 120 份</h4>
+      <p style="color:#7d3b36">
+        前台简历详情页前方是 nginx WAF，拦的是<strong>累计请求量</strong>而不是并发数。
+        用 8 线程、不限间隔连抓 200 份时，<strong>只有 120 份成功、80 份失败</strong>，
+        且失败的全部集中在后半段——导出的表里后 80 行整片空白，看起来就像「只拿到了后台的部分数据」。
+      </p>
+    </div>
+    <div class="step" style="border-left:4px solid #2f8f5b;background:#f6fbf8;margin-top:14px">
+      <h4 style="color:#236b45">修复：限速 + 自动补抓 + 覆盖率反馈</h4>
+      <p style="color:#2c5541">
+        改用 <strong>1 请求/秒</strong>限速重抓，那 80 份<strong>全部成功</strong>；200 份全量只用 <strong>256 秒</strong>，
+        <strong>200/200 全部拿到</strong>。v1.3.0 内置：失败<strong>自动再补 2 轮</strong>、
+        连拦 3 次<strong>自动熔断</strong>、中断后点「<strong>只补缺失详情</strong>」续抓，
+        并在界面实时显示「<strong>当前详情覆盖 120/200</strong>」——<strong>覆盖数 = 总行数</strong>才算全量。
+      </p>
+    </div>
+    <div class="note" style="margin-top:14px">
+      <strong>字段空缺 ≠ 抓取失败。</strong>200 份全量成功后的真实填充率：姓名/性别/年龄/自我描述详情
+      <strong>100%</strong>、学历 99%、工作经历 1 <strong>55%</strong>、头像 53%、现居地 45%、
+      教育经历 1 37%、获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，前台页面本身就没有那个区块。
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
     <h2 class="sec-title">三个子项目</h2>
     <p class="sec-sub">点击卡片进入各自的详细说明页；可执行文件在 Release 中下载。</p>
 
@@ -178,7 +207,7 @@
         </div>
         <div class="card-foot">
           <a class="btn primary" href="city-data-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.2.0/CityDataPanel-v1.2.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.3.0/CityDataPanel-v1.3.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -203,7 +232,7 @@
         </div>
         <div class="card-foot">
           <a class="btn teal" href="resume-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.2.0/ResumeCollector-v1.2.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.3.0/ResumeCollector-v1.3.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -228,7 +257,7 @@
         </div>
         <div class="card-foot">
           <a class="btn violet" href="combined-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.2.0/CombinedPanel-v1.2.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.3.0/CombinedPanel-v1.3.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 

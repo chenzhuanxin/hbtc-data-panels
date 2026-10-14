@@ -751,9 +751,14 @@ RESUME_DETAIL_HIDDEN = {'照片', '工作经历7', '工作经历8', '工作经�
                         '获得证书3', '获得证书4', '获得证书5'}
 
 
-def enrich_resume_details(cat='简历库', workers=None, limit=None):
+def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missing=False):
     """给简历库补抓前台简历详情，结果作为新列追加到每行末尾。
-    返回一段用于展示的说明文本。"""
+
+    only_missing=True 时**跳过已经有详情的行**，只补那些还空着的
+    （用于被 WAF 熔断中断后，稍后续抓剩下的部分，不必重跑全部）。
+
+    返回一段用于展示的说明文本。
+    """
     with DATA_LOCK:
         d = DATA.get(cat)
         if not d or not d.get('rows'):
@@ -770,13 +775,22 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
         return '（未配置前台 Cookie，已跳过简历详情；配置后可获取完整简历内容）'
 
     idx = cols.index('id')
-    jlids, seen = [], set()
+    # 判断“是否已有详情”的锚点列：姓名（前台详情 100% 有值）
+    name_idx = cols.index('姓名') if '姓名' in cols else None
+
+    jlids, seen, skipped = [], set(), 0
     for r in rows:
         rid = r[idx] if idx < len(r) else ''
         s = '' if rid in (None, '') else str(rid).strip()
-        if s and s not in seen:
-            seen.add(s)
-            jlids.append(s)
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        if only_missing and name_idx is not None:
+            has = name_idx < len(r) and str(r[name_idx] or '').strip()
+            if has:
+                skipped += 1
+                continue
+        jlids.append(s)
 
     if limit is None:
         try:
@@ -787,6 +801,8 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
         jlids = jlids[:limit]
 
     if not jlids:
+        if only_missing and skipped:
+            return f'（全部 {skipped} 份都已有详情，无需补抓）'
         return ''
 
     workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
@@ -795,8 +811,10 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
     except (TypeError, ValueError):
         rate = 1.0
     total = len(jlids)
-    print(f'[简历详情] 开始抓取 {total} 份（{workers} 线程，间隔 {rate}s ≈ '
-          f'{1.0 / max(rate, 0.01):.1f} 请求/秒，并发上限 2）…')
+    est = total * max(rate, 0.05)
+    print(f'[简历详情] 开始抓取 {total} 份（跳过已有 {skipped} 份；'
+          f'{workers} 线程，间隔 {rate}s ≈ {1.0 / max(rate, 0.01):.1f} 请求/秒，'
+          f'预计 {int(est // 60)} 分 {int(est % 60)} 秒）…')
     _set_progress(cat, msg=f'正在抓取 {total} 份简历详情（前台页）…',
                   detail_done=0, detail_total=total)
 
@@ -808,28 +826,47 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
     t0 = time.time()
     got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp,
                               min_interval=rate, max_inflight=2,
-                              waf_stop_after=3)
+                              waf_stop_after=3, retry_rounds=2, retry_delay=8.0)
     el = max(0.1, time.time() - t0)
     print(f'[简历详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
           f'需登录 {stat["need_login"]} 被拦截 {stat["waf_block"]}，'
-          f'用时 {int(el)}s（{stat["done"] / el:.2f} 请求/秒）')
+          f'{stat["rounds"]} 轮，用时 {int(el)}s（{stat["done"] / el:.2f} 请求/秒）')
 
     add = [c for c in DETAIL_COLS if c not in cols]
     if not add:
-        return f'；简历详情 {stat["ok"]} 份（无新增列）'
-
-    for r in rows:
-        rid = r[idx] if idx < len(r) else ''
-        s = '' if rid in (None, '') else str(rid).strip()
-        det = got.get(s) or {}
-        for c in add:
-            r.append(det.get(c, ''))
-    cols.extend(add)
+        # 列已存在：按 id 回填缺失单元格
+        for r in rows:
+            rid = r[idx] if idx < len(r) else ''
+            s = '' if rid in (None, '') else str(rid).strip()
+            det = got.get(s) or {}
+            for c in DETAIL_COLS:
+                if c not in cols:
+                    continue
+                ci = cols.index(c)
+                if ci >= len(r):
+                    continue
+                if not str(r[ci] or '').strip() and det.get(c):
+                    r[ci] = det[c]
+    else:
+        for r in rows:
+            rid = r[idx] if idx < len(r) else ''
+            s = '' if rid in (None, '') else str(rid).strip()
+            det = got.get(s) or {}
+            for c in add:
+                r.append(det.get(c, ''))
+        cols.extend(add)
 
     with DATA_LOCK:
         DATA[cat] = {'rows': rows, 'cols': cols, 'fetched_at': fetched_at,
                      'total': len(rows), 'detail_at': time.time()}
     save_cache(cat)
+
+    # 统计最终详情覆盖率（以「姓名」为锚点）
+    filled = 0
+    if '姓名' in cols:
+        ci = cols.index('姓名')
+        filled = sum(1 for r in rows if ci < len(r) and str(r[ci] or '').strip())
+    cover = f'，详情覆盖 {filled}/{len(rows)}'
 
     extra = ''
     if stat.get('waf_block'):
@@ -839,8 +876,23 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None):
         extra = f'（{stat["need_login"]} 份返回登录页，前台 Cookie 可能已失效）'
     if stat.get('stopped') and not stat.get('waf_block'):
         extra += '（已提前停止）'
-    return (f'；简历详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}'
+    if skipped:
+        extra += f'（跳过已有详情 {skipped} 份）'
+    return (f'；简历详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}{cover}'
             f'，新增 {len(add)} 列')
+
+
+def detail_coverage(cat='简历库'):
+    """返回 (已有详情数, 总行数)，用于界面提示"""
+    with DATA_LOCK:
+        d = DATA.get(cat)
+        if not d or not d.get('rows'):
+            return 0, 0
+        cols, rows = d['cols'], d['rows']
+        if '姓名' not in cols:
+            return 0, len(rows)
+        ci = cols.index('姓名')
+        return sum(1 for r in rows if ci < len(r) and str(r[ci] or '').strip()), len(rows)
 
 
 def start_fetch(cat, max_pages=0, use_ocr=True, with_detail=True):
@@ -1078,7 +1130,12 @@ def api_front_test():
 
 @app.route('/api/enrich_resume', methods=['POST'])
 def api_enrich_resume():
-    """对已抓取的简历库单独补抓前台简历详情（不重新拉列表）"""
+    """对已抓取的简历库单独补抓前台简历详情（不重新拉列表）
+
+    body 可选：{"only_missing": true} —— 只补还没有详情的那些（断点续抓）
+    """
+    d = request.get_json(force=True, silent=True) or {}
+    only_missing = bool(d.get('only_missing'))
     with JOB_LOCK:
         if '简历库' in FETCH_JOBS:
             return jsonify({'ok': False, 'msg': '简历库正在抓取中'})
@@ -1086,11 +1143,10 @@ def api_enrich_resume():
 
     def runner():
         try:
-            enrich_resume_details('简历库')
-            with DATA_LOCK:
-                n = len((DATA.get('简历库') or {}).get('rows') or [])
+            info = enrich_resume_details('简历库', only_missing=only_missing)
+            filled, tot = detail_coverage('简历库')
             _set_progress('简历库', phase='done',
-                          msg=f'简历详情补抓完成，共 {n} 行')
+                          msg=f'简历详情补抓完成{info}（详情覆盖 {filled}/{tot}）')
         except Exception as e:
             traceback.print_exc()
             _set_progress('简历库', phase='error', msg=f'简历详情抓取失败：{e}')

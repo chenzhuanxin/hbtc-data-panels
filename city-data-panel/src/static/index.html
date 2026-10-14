@@ -130,7 +130,10 @@ tbody tr:nth-child(even){background:#fafbfe}
           <input type="checkbox" id="withDetail" checked> 抓取简历详情（全量）
         </label>
         <span class="kv">详情限抓条数(0=全部) <input type="text" id="detailLimit" value="0" style="width:70px"></span>
-        <button class="ghost" onclick="App.enrichResume()">只补抓简历库详情</button>
+        <button class="ghost" onclick="App.enrichResume(false)"
+                title="对所有简历重新抓一遍前台详情（列已存在时按缺失单元格回填）">补抓简历库详情（全量）</button>
+        <button class="ghost" onclick="App.enrichResume(true)"
+                title="只补那些还没有详情的简历——被站点限速中断后用这个续抓，不必重跑已有部分">只补缺失详情</button>
         <button class="ghost" onclick="App.fetchAll()">一键抓取全部类目</button>
       </div>
     </div>
@@ -352,10 +355,13 @@ const App=(()=>{
     const r=await jpost('/api/front_test',{front_cookie:$('#frontCookie').value});
     flash($('#frontMsg'),(r.ok?'✔ ':'✘ ')+r.msg,r.ok?'ok':'err');
   }
-  async function enrichResume(){
+  async function enrichResume(onlyMissing){
     await saveConfig();
-    flash($('#frontMsg'),'已开始补抓简历库详情，请看抓取进度…','warn');
-    await jpost('/api/enrich_resume',{});
+    const tip = onlyMissing
+      ? '已开始【只补缺失详情】，将跳过已有详情、只抓空缺的那些…'
+      : '已开始【全量补抓简历详情】，请看抓取进度…';
+    flash($('#frontMsg'),tip,'warn');
+    await jpost('/api/enrich_resume',{only_missing:!!onlyMissing});
   }
 
   let pollTimer=null;

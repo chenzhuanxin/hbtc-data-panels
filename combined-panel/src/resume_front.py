@@ -225,31 +225,6 @@ def _extract_span_value(soup, label_text):
     return ''
 
 
-def extract_work_by_regex(html):
-    """兼容保留：对整页 HTML 正则提取（会串入证书/语言块，仅作兜底）"""
-    pattern = (r'<div class="j-work-module clearfix step-circle">(.*?)</div>\s*'
-               r'(?=<div class="j-work-module|</div>\s*</div>|$)')
-    blocks = re.findall(pattern, html, re.DOTALL)
-    results = []
-    for block in blocks:
-        m = re.search(r'<b>(.*?)</b>', block)
-        company = m.group(1).strip() if m else ''
-        m = re.search(r'<i class="time">(.*?)</i>', block)
-        period = _strip_paren(m.group(1)) if m else ''
-        m = re.search(r'职位名称：</span>\s*<span>(.*?)</span>', block)
-        position = m.group(1).strip() if m else ''
-        m = re.search(r'工作内容：</span>\s*<span>(.*?)</span>', block, re.DOTALL)
-        content = m.group(1).strip() if m else ''
-        parts = [company,
-                 f'（{period}）' if period else '',
-                 f'职位名称：{position}' if position else '',
-                 f'工作内容：{content}' if content else '']
-        result = ' '.join([p for p in parts if p])
-        if result:
-            results.append(result)
-    return results
-
-
 def _parse_education(edu_ul):
     school = period = ''
     first_li = edu_ul.find('li', class_='j-pos')
@@ -562,34 +537,16 @@ def fetch_one(jlid, cookie_str, timeout=25, retries=3, session=None):
     return {'_error': str(last or 'unknown'), '简历ID': jlid}
 
 
-def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
-               timeout=25, retries=3, min_interval=None, max_inflight=None,
-               waf_stop_after=3):
-    """
-    并发抓取多份简历。返回 (out, stats)
-
-      out    : {jlid: detail_dict}    只含成功的
-      stats  : {'done','ok','fail','need_login','waf_block','total','stopped'}
-
-    on_progress(done, total, ok, fail) 每完成一份回调一次
-    should_stop() 返回 True 时提前结束
-
-    ⚠️ 并发只在「全局限速」的框架内生效：无论 workers 多大，实际请求速率
-    都被 MIN_INTERVAL 卡住（默认 1 请求/秒，与站点可承受速率一致），
-    同时在途连接数也被 MAX_INFLIGHT 限制。一旦命中 WAF 达到
-    waf_stop_after 次，直接停止剩余任务，避免把 IP 打进更长时间的黑名单。
-    """
+def _fetch_round(jlids, cookie_str, workers, timeout, retries, should_stop=None,
+                 on_progress=None, offset=0, grand_total=None, ok0=0, fail0=0,
+                 stats=None, out=None, lock=None):
+    """跑一轮并发抓取；成功的写入 out，失败的收集后返回，供下一轮重试。"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    if min_interval is not None or max_inflight is not None:
-        set_rate(min_interval, max_inflight)
-
-    total = len(jlids)
-    out = {}
-    done = ok = fail = 0
-    lock = threading.Lock()
-    counters = {'need_login': 0, 'waf_block': 0}
-    stopped = [False]
+    stats = stats if stats is not None else {'need_login': 0, 'waf_block': 0}
+    out = out if out is not None else {}
+    lock = lock or threading.Lock()
+    grand = grand_total or len(jlids)
 
     def work(jid):
         one = requests.Session()
@@ -597,6 +554,10 @@ def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
         one.cookies = requests.cookies.cookiejar_from_dict(normalize_cookie(cookie_str))
         return jid, fetch_one(jid, cookie_str, timeout=timeout,
                               retries=retries, session=one)
+
+    failed = []
+    stopped = [False]
+    done = [0]
 
     with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
         futs = [ex.submit(work, j) for j in jlids]
@@ -606,27 +567,108 @@ def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
                     f.cancel()
                 stopped[0] = True
                 break
-            jid, res = fu.result()
+            try:
+                jid, res = fu.result()
+            except Exception as e:
+                jid, res = None, {'_error': f'{type(e).__name__}: {e}'}
             with lock:
-                done += 1
-                if res and not res.get('_error'):
+                done[0] += 1
+                err = (res or {}).get('_error')
+                if res and not err:
                     out[jid] = res
-                    ok += 1
                 else:
-                    fail += 1
-                    err = (res or {}).get('_error')
+                    failed.append(jid)
                     if err == 'need_login':
-                        counters['need_login'] += 1
+                        stats['need_login'] += 1
                     elif err == 'waf_block':
-                        counters['waf_block'] += 1
-                if counters['waf_block'] >= waf_stop_after:
-                    stopped[0] = True
+                        stats['waf_block'] += 1
                 if on_progress:
-                    on_progress(done, total, ok, fail)
-    return out, {'done': done, 'ok': ok, 'fail': fail,
-                 'need_login': counters['need_login'],
-                 'waf_block': counters['waf_block'],
-                 'total': total, 'stopped': stopped[0]}
+                    on_progress(offset + done[0], grand, len(out),
+                                fail0 + len(failed))
+    return out, failed, stats, stopped[0]
+
+
+def fetch_many(jlids, cookie_str, workers=4, on_progress=None, should_stop=None,
+               timeout=25, retries=3, min_interval=None, max_inflight=None,
+               waf_stop_after=3, retry_rounds=2, retry_delay=8.0):
+    """
+    并发抓取多份简历（全量）。返回 (out, stats)
+
+      out    : {jlid: detail_dict}    只含成功的
+      stats  : {'done','ok','fail','need_login','waf_block','total','stopped',
+                'rounds'}
+
+    on_progress(done, total, ok, fail) 每完成一份回调一次
+    should_stop() 返回 True 时提前结束
+
+    可靠抓取策略（保证"全量"）：
+      1) 全局限速：无论 workers 多大，实际速率被 MIN_INTERVAL 卡住
+         （默认 1 请求/秒），在途连接由 MAX_INFLIGHT 限制。
+      2) 失败自动补抓：第一轮结束后，对失败的 id 再跑 `retry_rounds` 轮，
+         轮间等待 `retry_delay` 秒（给站点缓冲）。
+      3) WAF 熔断：一旦命中拦截页达到 waf_stop_after 次，立即停止本批，
+         避免把 IP 打进更长时间的黑名单；停止后未抓到的 id 由调用方
+         在稍后「只补缺失」时续抓。
+    """
+    if min_interval is not None or max_inflight is not None:
+        set_rate(min_interval, max_inflight)
+
+    total = len(jlids)
+    if not total:
+        return {}, {'done': 0, 'ok': 0, 'fail': 0, 'need_login': 0,
+                    'waf_block': 0, 'total': 0, 'stopped': False, 'rounds': 0}
+
+    out, stats_all = {}, {'need_login': 0, 'waf_block': 0}
+    lock = threading.Lock()
+    pending = list(jlids)
+    rounds = 0
+    stopped = False
+    ok_total = 0
+
+    for rnd in range(max(1, retry_rounds + 1)):
+        if not pending:
+            break
+        if rnd > 0:
+            if should_stop and should_stop():
+                stopped = True
+                break
+            # 轮间缓冲：只有在上一轮"有失败"时才等待
+            wait = retry_delay * rnd
+            if on_progress:
+                on_progress(ok_total, total, ok_total, len(pending))
+            t_end = time.time() + wait
+            while time.time() < t_end:
+                if should_stop and should_stop():
+                    break
+                time.sleep(min(0.5, t_end - time.time()))
+
+        rounds = rnd + 1
+        before_waf = stats_all['waf_block']
+        offset = ok_total
+        _fetch_round(pending, cookie_str, workers, timeout, retries,
+                     should_stop=should_stop, on_progress=on_progress,
+                     offset=offset, grand_total=total, ok0=before_waf,
+                     stats=stats_all, out=out, lock=lock)
+
+        ok_total = len(out)
+        # 待补 = 仍未成功的
+        pending = [j for j in pending if j not in out]
+
+        # WAF 熔断：本轮出现新的拦截页，立即停止，不再补抓
+        if stats_all['waf_block'] > before_waf and \
+                stats_all['waf_block'] >= waf_stop_after:
+            stopped = True
+            break
+        if not pending:
+            break
+
+    fail_n = total - len(out)
+    if on_progress:
+        on_progress(total, total, len(out), fail_n)
+    return out, {'done': total, 'ok': len(out), 'fail': fail_n,
+                 'need_login': stats_all['need_login'],
+                 'waf_block': stats_all['waf_block'],
+                 'total': total, 'stopped': stopped, 'rounds': rounds}
 
 
 def test_front_cookie(cookie_str, probe_jlid='1906236'):
