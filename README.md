@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" width="120" alt="hbtc-data-panels"></p>
+
 # 城市中国 · 湖北通城网 数据采集面板合集
 
 面向 **城市中国 · 湖北通城网（hbtc.ccoo.cn）** 招聘后台的 Windows 桌面采集工具集。
