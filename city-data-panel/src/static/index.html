@@ -126,25 +126,12 @@ tbody tr:nth-child(even){background:#fafbfe}
       <h2 style="margin-bottom:0">② 数据抓取</h2>
       <div class="row">
         <span class="kv">单类目限抓页数(0=全部) <input type="text" id="maxPages" value="0" style="width:60px"></span>
-        <label class="kv" title="抓取简历库后，自动逐份打开前台简历详情页，补全工作经历/教育经历/语言/证书等全量字段（需要前台 Cookie）">
-          <input type="checkbox" id="withDetail" checked> 抓取简历详情（全量）
+        <label class="kv" title="抓取类目时是否同步从前台补全全量字段。简历的工作经历/教育经历/语言/证书、岗位的职位描述/公司信息等详情字段都来自前台页面；具体类目下方可单独勾选，此处为全局默认">
+          <input type="checkbox" id="withDetail" checked> 抓取时同步补全前台全量字段（默认）
         </label>
         <span class="kv">详情限抓条数(0=全部) <input type="text" id="detailLimit" value="0" style="width:70px"></span>
-        <button class="ghost" onclick="App.enrichResume(false)"
-                title="对所有简历重新抓一遍前台详情（列已存在时按缺失单元格回填）">补抓简历库详情（全量）</button>
-        <button class="ghost" onclick="App.enrichResume(true)"
-                title="只补那些还没有详情的简历——被站点限速中断后用这个续抓，不必重跑已有部分">只补缺失详情</button>
-        <span class="kv">
-          <select id="jobCat" style="width:auto">
-            <option value="全职岗位">全职岗位</option>
-            <option value="兼职岗位">兼职岗位</option>
-          </select>
-          <button class="ghost" onclick="App.enrichJob(false)"
-                  title="对所选岗位类目补抓前台岗位详情（全量字段：职位类别/学历要求/招聘人数/工作经验/公司地址/更新时间/剩余有效期/关注度/职位描述/公司介绍/公司行业/规模/性质等）">补抓岗位详情（全量）</button>
-          <button class="ghost" onclick="App.enrichJob(true)"
-                  title="只补所选岗位类目中还没有详情的岗位——被站点限速中断后用这个续抓，不必重跑已有部分">只补缺失岗位详情</button>
-        </span>
         <button class="ghost" onclick="App.fetchAll()">一键抓取全部类目</button>
+        <span class="kv" style="color:#c62828;font-weight:bold">↓ 简历库、全职岗位、兼职岗位下方各有「补抓详情」勾选与按钮</span>
       </div>
     </div>
     <div class="cats" id="cats" style="margin-top:12px"></div>
@@ -213,7 +200,7 @@ const App=(()=>{
     $('#frontCookie').value=cfg.front_cookie||'';
     $('#ocrScale').value=cfg.ocr_scale||1;
     $('#fetchWorkers').value=cfg.fetch_workers||4;
-    $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?1:cfg.front_rate;
+    $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?3:cfg.front_rate;
     if($('#withDetail')) $('#withDetail').checked=(cfg.fetch_resume_detail===undefined?true:!!cfg.fetch_resume_detail);
     if($('#detailLimit')) $('#detailLimit').value=cfg.resume_detail_limit||0;
     if(!cfg.front_cookie) flash($('#frontMsg'),'未配置前台 Cookie，简历库将没有完整内容','warn');
@@ -231,9 +218,28 @@ const App=(()=>{
     const box=$('#cats'); box.innerHTML='';
     for(const c of CATS){
       const d=document.createElement('div'); d.className='cat'; d.id='cat_'+c;
+      let extra='';
+      if(c==='简历库'){
+        extra=`<div class="drow" style="margin-top:6px">
+          <label style="font-size:12px"><input type="checkbox" id="withDetail_${c}" checked>
+            抓取时同步补全前台简历全量字段</label>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichResume(false)">补抓简历详情(全量)</button>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichResume(true)">只补缺失</button>
+        </div>
+        <div class="dtip" style="font-size:11px;color:#888">工作经历/教育经历/语言/证书等全量字段来自前台简历详情页（需前台Cookie，被拦时等冷却后点「只补缺失」续抓）</div>`;
+      }else if(c==='全职岗位'||c==='兼职岗位'){
+        extra=`<div class="drow" style="margin-top:6px">
+          <label style="font-size:12px"><input type="checkbox" id="withDetail_${c}" checked>
+            抓取时同步补全前台岗位全量字段</label>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichJob('${c}',false)">补抓岗位详情(全量)</button>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichJob('${c}',true)">只补缺失</button>
+        </div>
+        <div class="dtip" style="font-size:11px;color:#888">职位类别/学历/人数/经验/描述/公司信息等全量字段来自前台岗位详情页（需前台Cookie，被拦时等冷却后点「只补缺失」续抓）</div>`;
+      }
       d.innerHTML=`<div class="t"><span>${c}${INFO[c].ocr?'<span class="badge">电话OCR</span>':''}</span>
         <button onclick="App.fetchOne('${c}')">抓取</button></div>
         <div class="meta" id="meta_${c}">${INFO[c].rows?INFO[c].rows.toLocaleString()+' 条 · '+INFO[c].fetched_at:'尚未抓取'}</div>
+        ${extra}
         <div class="bar" id="bar_${c}"><i></i></div>
         <div class="pstat" id="pstat_${c}"></div>`;
       box.appendChild(d);
@@ -352,13 +358,16 @@ const App=(()=>{
 
   async function fetchOne(c){
     await saveConfig();
+    const wd=$('#withDetail_'+c)?$('#withDetail_'+c).checked:($('#withDetail')&&$('#withDetail').checked);
     await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,
-      with_detail:$('#withDetail')&&$('#withDetail').checked});
+      with_detail:wd});
   }
   async function fetchAll(){
     await saveConfig();
-    const wd=$('#withDetail')?$('#withDetail').checked:true;
-    for(const c of CATS){await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,with_detail:wd});}
+    for(const c of CATS){
+      const wd=$('#withDetail_'+c)?$('#withDetail_'+c).checked:($('#withDetail')?$('#withDetail').checked:true);
+      await jpost('/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,with_detail:wd});
+    }
   }
   async function testFrontCookie(){
     flash($('#frontMsg'),'正在测试前台 Cookie…','warn');
@@ -373,9 +382,8 @@ const App=(()=>{
     flash($('#frontMsg'),tip,'warn');
     await jpost('/api/enrich_resume',{only_missing:!!onlyMissing});
   }
-  async function enrichJob(onlyMissing){
+  async function enrichJob(cat, onlyMissing){
     await saveConfig();
-    const cat=($('#jobCat')?$('#jobCat').value:'全职岗位');
     const tip = onlyMissing
       ? `已开始【只补缺失岗位详情】(${cat})，将跳过已有详情、只抓空缺的那些…`
       : `已开始【全量补抓岗位详情】(${cat})，请看抓取进度…`;
@@ -430,7 +438,7 @@ const App=(()=>{
       cookie:$('#cookie').value,front_cookie:$('#frontCookie').value,
       save_dir:$('#saveDir').value,ocr_scale:parseInt($('#ocrScale').value)||1,
       fetch_workers:parseInt($('#fetchWorkers').value)||4,
-      front_rate:parseFloat($('#frontRate').value)||1,
+      front_rate:parseFloat($('#frontRate').value)||3,
       fetch_resume_detail:$('#withDetail')&&$('#withDetail').checked?1:0,
       resume_detail_limit:parseInt($('#detailLimit')&&$('#detailLimit').value)||0});
     flash($('#connMsg'),'已保存','ok');
@@ -453,7 +461,7 @@ const App=(()=>{
       $('#ocrScale').value=cfg.ocr_scale||1;
       $('#frontCookie').value=cfg.front_cookie||'';
       $('#fetchWorkers').value=cfg.fetch_workers||4;
-      $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?1:cfg.front_rate;
+      $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?3:cfg.front_rate;
     }catch(err){flash($('#connMsg'),'导入失败：'+err,'err');}
     e.target.value='';
   }
