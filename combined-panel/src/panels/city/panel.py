@@ -323,7 +323,7 @@ CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
                   'front_cookie': '',
                   'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 4,
-                  'front_rate': 1.0,               # 前台简历请求最小间隔（秒），1.0=1请求/秒
+                  'front_rate': 3.0,               # 前台岗位/简历请求最小间隔（秒），3.0≈0.33请求/秒，低速防WAF拉黑
                   'fetch_resume_detail': 1,        # 简历库是否补抓前台简历详情
                   'resume_detail_limit': 0}        # 0 = 不限条数
 
@@ -821,7 +821,7 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missin
 
     workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
     try:
-        rate = float(CONFIG.get('front_rate') or 2.0)
+        rate = float(CONFIG.get('front_rate') or 3.0)
     except (TypeError, ValueError):
         rate = 1.0
     total = len(jlids)
@@ -975,7 +975,7 @@ def enrich_job_details(cat='全职岗位', workers=None, limit=None, only_missin
 
     workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
     try:
-        rate = float(CONFIG.get('front_rate') or 2.0)
+        rate = float(CONFIG.get('front_rate') or 3.0)
     except (TypeError, ValueError):
         rate = 1.0
     total = len(jobids)

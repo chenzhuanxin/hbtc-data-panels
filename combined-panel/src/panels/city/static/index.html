@@ -115,7 +115,7 @@ tbody tr:nth-child(even){background:#fafbfe}
       <label class="f">导入配置(JSON)<input type="file" id="importFile" accept=".json" style="font-size:12px"></label>
       <label class="f">OCR放大倍数<input type="text" id="ocrScale" style="width:60px" value="1" title="RapidOCR 建议 1（实测 1 倍最准）"></label>
       <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
-      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="2" title="岗位与简历前台详情统一使用的请求间隔（秒）。2 ≈ 0.5 请求/秒，更安全；前台站点对高频访问极敏感（IP 频繁访问即 403 拉黑），调小会更快但更容易被封 IP。若被拦，请调大到 3-5 并等待十几分钟冷却"></label>
+      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="3" title="岗位与简历前台详情统一使用的请求间隔（秒）。3 ≈ 0.33 请求/秒，低速更安全；前台站点对高频访问极敏感（IP 频繁访问即 403 拉黑），若被拦请调大到 4-5 并等待十几分钟冷却"></label>
       <span id="connMsg" class="msg"></span>
     </div>
   </div>
