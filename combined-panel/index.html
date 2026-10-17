@@ -126,13 +126,13 @@
           <thead><tr><th style="width:24%">入口</th><th style="width:30%">等价于</th><th>说明</th></tr></thead>
           <tbody>
             <tr><td class="mono"><code>/</code></td><td>门户导航页</td><td>两个工具的入口卡片，显示各自配置状态</td></tr>
-            <tr><td class="mono"><code>/city/</code></td><td>平台数据面板</td><td>7 类目全量抓取 + 电话图片 OCR + 简历全量字段补抓</td></tr>
+            <tr><td class="mono"><code>/city/</code></td><td>平台数据面板</td><td>7 类目全量抓取 + 电话图片 OCR + 简历/岗位/企业/用户全量字段补抓</td></tr>
             <tr><td class="mono"><code>/jd/</code></td><td>企业投递简历采集面板</td><td>企业 → 岗位 → 投递简历 → 完整简历内容</td></tr>
           </tbody>
         </table>
       </div>
       <div class="note">
-        <b>为什么不用两个 exe 就行？</b>当然可以。但两个独立面板各自要填一遍后台 Cookie、前台 Cookie、保存目录，
+        <b>为什么不用两个 exe 就行？</b>当然可以。但两个独立面板各自要填一遍后台 Cookie、总后台 Cookie、保存目录，
         换台电脑或 Cookie 过期时得改两处。综合面板里这些<b>只填一次</b>，两个子面板实时共享。
       </div>
     </div>
@@ -148,13 +148,12 @@
         <table>
           <thead><tr><th style="width:26%">配置项</th><th style="width:16%">默认</th><th>用途</th></tr></thead>
           <tbody>
-            <tr><td class="mono"><code>cookie</code></td><td>—</td><td>后台 Cookie，供 <b>两个</b>子面板的列表类接口使用</td></tr>
-            <tr><td class="mono"><code>front_cookie</code></td><td>—</td><td>前台 Cookie，供 <b>两个</b>子面板抓完整简历内容</td></tr>
+            <tr><td class="mono"><code>cookie</code></td><td>—</td><td>后台 Cookie（job.admin.ccoo.cn），供 <b>两个</b>子面板的列表接口 + 简历/岗位/企业详情使用</td></tr>
+            <tr><td class="mono"><code>master_cookie</code></td><td>—</td><td>总后台 Cookie（www.admin.ccoo.cn），仅「注册用户」全量字段需要，可留空</td></tr>
             <tr><td class="mono"><code>save_dir</code></td><td>—</td><td>导出的默认保存目录</td></tr>
             <tr><td class="mono"><code>ocr_scale</code></td><td>1</td><td>电话图片 OCR 放大倍数（实测 1 最准）</td></tr>
-            <tr><td class="mono"><code>fetch_workers</code></td><td>4</td><td>抓取线程（1–8）</td></tr>
-            <tr><td class="mono"><code>front_rate</code></td><td>1.0</td><td>前台简历请求最小间隔（秒），见下文反爬说明</td></tr>
-            <tr><td class="mono"><code>fetch_resume_detail</code></td><td>1</td><td>平台数据面板：抓简历库时是否顺带补抓完整简历</td></tr>
+            <tr><td class="mono"><code>fetch_workers</code></td><td>8</td><td>列表 / 后台详情并发线程（后台无 WAF，调大即提速）</td></tr>
+            <tr><td class="mono"><code>fetch_resume_detail</code></td><td>1</td><td>平台数据面板：抓类目时是否顺带补抓后台全量字段</td></tr>
             <tr><td class="mono"><code>resume_detail_limit</code></td><td>0</td><td>平台数据面板：详情条数上限，0 = 不限</td></tr>
           </tbody>
         </table>
@@ -176,59 +175,33 @@
 
 <section>
   <div class="wrap">
-    <h2>⚠️ 反爬限速与「为什么以前只拿到一部分」（v1.3.0 重点）</h2>
-    <p class="lead">前台简历详情页不能快抓——这是这个工具集里唯一的「硬约束」；快抓的代价是<b>静默丢掉后半段数据</b>。</p>
+    <h2>详情抓取机制（v2.0：全面切换后台编辑页）</h2>
+    <p class="lead">v2.0 起所有详情都从<b>后台 / 总后台编辑页</b>抓取：不再抓前台网站，不再需要前台 Cookie，也绕开了前台 WAF。</p>
 
-    <div class="note warn">
-      <b>真实事故：8 线程快抓 200 份，只成功 120 份。</b>
-      前台简历页 <code>/post/qiuzhi/{id}x.html</code> 前方是 nginx WAF。用 8 线程、不限间隔连抓 200 份时，
-      <b>只有 120 份成功、80 份失败</b>，且失败的全部集中在后半段（「前 120 份全成、后 80 份全败」）。
-      导出的表里后 80 行整片空白，看起来就像「只拿到了后台的部分数据」。
-      事后用 1 请求/秒限速重抓，<b>那 80 份全部成功</b>，200 份全量只用 256 秒。
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:16%">数据</th><th style="width:52%">详情来源</th><th>所需 Cookie</th></tr></thead>
+        <tbody>
+          <tr><td>简历全量字段</td><td class="mono"><code>job.admin.ccoo.cn/Post/JlEdit?source=1&amp;jlid={jlid}</code></td><td>后台 Cookie</td></tr>
+          <tr><td>岗位全量字段（全职+兼职）</td><td class="mono"><code>job.admin.ccoo.cn/Post/JobEdit?Source=1&amp;id={jobid}</code></td><td>后台 Cookie</td></tr>
+          <tr><td>企业全量字段</td><td class="mono"><code>job.admin.ccoo.cn/Enterprise/CompanyAdd?source=1&amp;companyId={companyId}</code></td><td>后台 Cookie</td></tr>
+          <tr><td>用户全量字段</td><td class="mono"><code>www.admin.ccoo.cn/yunying/users/user_set.asp?id={userId}</code></td><td><b>总后台 Cookie</b>（纯文本，无需 OCR）</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <p>
-      WAF 拦的是<b>累计请求量</b>，不是瞬时并发。实测约在第 120 份开始返回带滑动验证的 <code>403</code>
-      （文案「疑似异常访问请求，已被系统拦截 / IP频繁访问」），之后<b>本机 IP 被临时拉黑十几分钟</b>，
-      连正常请求也一起 403。对比手工脚本（<b>单线程 + 每份 <code>time.sleep(1)</code></b>）长期可用，
-      可见瓶颈是<b>请求速率</b>而不是并发数。v1.3.0 因此内置了这一整套保障：
-    </p>
     <ul class="list">
-      <li><b>全局令牌桶</b>：任意两次前台请求之间强制间隔 <code>front_rate</code> 秒，默认 <code>1.0</code>（≈1 请求/秒）。</li>
-      <li><b>在途并发上限 2</b>：用信号量限制同时打开的连接数，避免多连接同时打到同一 IP。</li>
-      <li><b>失败自动补抓</b>：一轮跑完后，对失败的简历<b>自动再跑 2 轮</b>（轮间等 8 秒），直到抓全。</li>
-      <li><b>WAF 熔断</b>：连续 3 次被 WAF 拦截就立即停止本批，并提示「已自动熔断」，避免把 IP 打进更长时间黑名单。</li>
-      <li><b>只补缺失详情</b>：中断后点这个按钮，<b>跳过已有详情</b>、只抓空缺的那些，不必重跑已有部分。</li>
-      <li><b>命中即短路</b>：识别到「网络安全验证 / 疑似异常访问请求 / IP频繁访问」立刻返回，不重试不睡眠，不再把 403 页当成简历内容。</li>
+      <li><b>不再需要前台 Cookie</b>：简历正文从后台编辑页 JlEdit 直接拿，字段比前台更全。</li>
+      <li><b>全并发提速</b>：后台编辑页无前台 nginx WAF，无令牌桶限速、无请求间隔，<code>fetch_workers</code> 默认 <code>8</code>，调大即提速。</li>
+      <li><b>失败自动补抓</b>：一轮跑完后，对失败的详情自动再跑 2 轮；<code>need_login</code> 单独统计，Cookie 失效时明确提示。</li>
+      <li><b>断点续抓</b>：按锚点列（姓名 / 岗位标题 / 企业名称 / 家乡通ID）判断详情是否已有，「只补缺失」跳过已有、只抓空缺。</li>
+      <li><b>覆盖率反馈</b>：结束时报告「详情覆盖 200/200」；覆盖数 = 总行数即拿到全量。</li>
     </ul>
-
-    <div class="note">
-      <b>怎么确认「拿到了全量」：</b>补抓结束后面板会直接报告<b>覆盖率</b>，例如
-      「简历详情 成功 200 / 失败 0，<b>详情覆盖 200/200</b>，新增 39 列」；抓取过程中也实时显示
-      「<b>当前详情覆盖 120/200</b>」。<b>覆盖数 = 总行数</b>就说明每一份简历都取到了前台详情。
-      若显示「成功 120 / 失败 80」，点「<b>只补缺失详情</b>」隔十几分钟续抓即可。
-    </div>
 
     <div class="note">
       <b>字段空缺不等于抓取失败：</b>200 份全量成功后的真实填充率为——姓名/性别/年龄/自我描述详情
       <b>100%</b>、学历 99%、工作经历 1 <b>55%</b>、头像 53%、现居地 45%、教育经历 1 37%、
-      获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，前台页面本身就没有那个区块。
-    </div>
-
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th style="width:30%">规模</th><th style="width:22%">按 1 请求/秒估算</th><th>备注</th></tr></thead>
-        <tbody>
-          <tr><td>200 份简历详情</td><td class="num">约 4 分钟</td><td>本工具集实测全量成功 200/200</td></tr>
-          <tr><td>500 份简历详情</td><td class="num">约 8 分钟</td><td>典型企业投递场景</td></tr>
-          <tr><td>15,733 份（简历库全量）</td><td class="num">约 4–5 小时</td><td>建议分批跑，中途被拦就等几分钟续抓</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="note">
-      <b>不要把「抓取线程」当加速手段。</b>前台速率由「前台请求间隔」决定，线程调到 8 也不会更快，只会更容易触发拦截。
-      真要提速就把「前台请求间隔」调小（例如 <code>0.5</code>），但要自己承担被封 IP 的风险。
-      列表类接口（7 个类目、企业搜索、岗位、投递明细）走后台 <code>job.admin.ccoo.cn</code>，<b>不受此限速影响</b>。
+      获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，后台表单里本身就没有那个区块。
     </div>
   </div>
 </section>
@@ -238,9 +211,9 @@
     <h2>使用流程</h2>
     <div class="grid2">
       <div class="mini"><h4>① 启动 exe</h4><p>双击 <code>城市中国综合数据面板.exe</code>，控制台会打印三个入口地址并自动打开门户页。</p></div>
-      <div class="mini"><h4>② 进任一子面板填配置</h4><p>进 <code>/city/</code> 或 <code>/jd/</code>，填后台 Cookie、前台 Cookie、保存目录，点「保存配置」。填一次即可。</p></div>
-      <div class="mini"><h4>③ 验证两种 Cookie</h4><p>「测试连接」验后台，「测试前台 Cookie」验前台。前台测试会用一份真实简历探测，返回姓名即通过。</p></div>
-      <div class="mini"><h4>④ 抓取</h4><p><code>/city/</code> 勾选类目抓 7 类数据（简历库可顺带补详情）；<code>/jd/</code> 搜企业后抓投递与完整简历。</p></div>
+      <div class="mini"><h4>② 进任一子面板填配置</h4><p>进 <code>/city/</code> 或 <code>/jd/</code>，填后台 Cookie、总后台 Cookie（可留空）、保存目录，点「保存配置」。填一次即可。</p></div>
+      <div class="mini"><h4>③ 验证 Cookie</h4><p>「测试连接」验后台；「测试总后台 Cookie」验总后台（用指定用户探测）。需要用户全量字段才必须配总后台 Cookie。</p></div>
+      <div class="mini"><h4>④ 抓取</h4><p><code>/city/</code> 勾选类目抓 7 类数据（自动补后台全量字段）；<code>/jd/</code> 搜企业后抓投递与完整简历。</p></div>
       <div class="mini"><h4>⑤ 导出</h4><p><code>/city/</code> 勾选类目导出 xlsx / zip；<code>/jd/</code> 选择「岗位列表 / 投递简历 / 两者都要」导出。</p></div>
       <div class="mini"><h4>⑥ 换工具不重填</h4><p>切到另一个子面板时，Cookie 与保存目录已经就位，直接开抓即可。</p></div>
     </div>
@@ -277,15 +250,15 @@
 ├── README.md
 └── src/
     ├── 面板.py                       # 入口：门户 + DispatcherMiddleware 挂载两个子面板
+    ├── admin_detail.py               # 后台详情抓取模块（JlEdit / JobEdit / CompanyAdd / user_set.asp，与独立项目同源）
     ├── panels/
     │   ├── __init__.py
     │   ├── city/                     # 平台数据子面板（源自独立项目）
-    │   │   ├── panel.py              #   抓取 + OCR + 简历详情补抓 + 导出
+    │   │   ├── panel.py              #   抓取 + OCR + 简历/岗位/企业/用户详情补抓 + 导出
     │   │   └── static/index.html     #   子面板前端
     │   └── jd/                       # 企业投递子面板（源自独立项目）
     │       ├── panel.py
     │       └── static/index.html
-    ├── resume_front.py               # 前台简历抓取模块（含反爬限速，与独立项目同源）
     ├── static/
     │   └── index.html                # 门户首页
     ├── 打包exe.py                    # 一键 PyInstaller 打包脚本
@@ -296,7 +269,7 @@
 
     <h3>方式一：直接运行 exe（推荐）</h3>
     <p>到 <a href="https://github.com/chenzhuanxin/hbtc-data-panels/releases">Release 页面</a>下载
-      <code>CombinedPanel-v1.3.0-windows-x64.exe</code>，放到一个单独目录里双击即可。
+      <code>CombinedPanel-v2.0.0-windows-x64.exe</code>，放到一个单独目录里双击即可。
       首次运行会在 exe 同目录生成 <code>config.json</code>、<code>数据_平台面板/</code> 与 <code>数据_简历面板/</code>。</p>
 
     <h3>方式二：源码运行</h3>
@@ -306,9 +279,9 @@ pip install flask requests beautifulsoup4 lxml rapidocr_onnxruntime openpyxl onn
 # 2) 准备配置（首次）
 cd src
 copy config.example.json config.json
-#   cookie / front_cookie  = 后台 / 前台 Cookie（两个子面板共用）
-#   fetch_workers          = 抓取线程（1-8，默认 4）
-#   front_rate             = 前台简历请求最小间隔（秒），默认 1.0
+#   cookie        = 后台 Cookie（两个子面板共用：列表接口 + 简历/岗位/企业详情）
+#   master_cookie = 总后台 Cookie（注册用户全量字段，可留空）
+#   fetch_workers = 列表/详情并发线程（默认 8）
 
 # 3) 启动
 python -X utf8 面板.py
@@ -337,16 +310,15 @@ python 打包exe.py
 
       <h3>两个子面板的配置会互相覆盖吗？</h3>
       <p>不会。两边读的都是「默认值 → 合并磁盘文件」的结果，保存时把合并后的完整对象写回，所以各自的专属键（例如
-        <code>ocr_scale</code>、<code>fetch_resume_detail</code>）会一直保留。共享的是 Cookie、保存目录、线程与限速这些公共项。</p>
+        <code>ocr_scale</code>、<code>fetch_resume_detail</code>）会一直保留。共享的是 Cookie、保存目录与线程这些公共项。</p>
 
-      <h3>提示「被站点安全策略拦截」？</h3>
-      <p>前台 IP 被 WAF 临时拉黑了。等几分钟，把「前台请求间隔」调大（例如 1.5 或 2），再点「只补抓简历库详情」续抓即可。
-        已抓到的部分不会丢。</p>
+      <h3>注册用户没有全量字段？</h3>
+      <p>总后台 Cookie 没配或已过期。配好 <code>master_cookie</code> 后点「只补抓用户详情」即可，不必重抓列表。</p>
 
       <h3>简历库抓完了，但没有工作经历 / 教育经历？</h3>
-      <p>前台 Cookie 没配或已过期。列表接口本身不含简历正文，补抓详情必须带前台站点的登录 Cookie。</p>
+      <p>后台 Cookie 没配或已过期。列表接口本身不含简历正文，补抓详情必须带后台 Cookie 访问编辑页 JlEdit。</p>
 
-      <h3>前台 Cookie 测试提示「返回登录页」？</h3>
+      <h3>测试总后台 Cookie 提示「返回登录页」？</h3>
       <p>① Cookie 已过期 → 重新登录复制；② 整串很长，可能漏了后半段；③ 粘贴时被换行截断。
         另外这条 Cookie 串<b>只能用分号 <code>;</code> 切分</b>——<code>ccoo=logintime=…&amp;uid=…</code> 这类 Cookie 的
         <b>值本身含 <code>&amp;</code></b>，按 <code>&amp;</code> 拆会把它截断，认证随即失效。面板已按正确规则处理，整串粘贴即可。</p>

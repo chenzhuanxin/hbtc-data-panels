@@ -29,7 +29,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
-import resume_front as RF
+import admin_detail as RF
 
 sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
 sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
@@ -105,9 +105,9 @@ def resume_link(jlid):
 # ----------------------------------------------------------------------
 # 导出列定义
 #
-# 简历内容改为抓取【前台简历详情页】www.hbtc.ccoo.cn/post/qiuzhi/{jlid}x.html
-# （后台 /Post/JlEdit 字段不全，只能拿部分内容）。
-# 因此列集合与 resume_front.DETAIL_COLS 对齐，保证详情可直接按列名合并。
+# v2.0：简历内容直接抓取【后台编辑页】job.admin.ccoo.cn/Post/JlEdit（字段最全），
+# 不再需要前台 Cookie；岗位/企业全量字段分别来自 JobEdit / CompanyAdd 编辑页。
+# 列集合与 admin_detail.DETAIL_COLS 对齐，详情可直接按列名合并。
 # ----------------------------------------------------------------------
 WORK_COLS = RF.WORK_COLS     # 工作经历 1-10
 EDU_COLS = RF.EDU_COLS       # 教育经历 1-5
@@ -133,8 +133,10 @@ HIDDEN_COLS = {'头像', '照片',
                '语言能力2', '语言能力3', '语言能力4', '语言能力5',
                '获得证书3', '获得证书4', '获得证书5'}
 
-JOB_SHEET_COLS = ['序号', '岗位类型', '岗位ID', '岗位名称', '岗位链接', '投递简历数', '发布时间']
-JOB_SHEET_HIDDEN = set()
+JOB_SHEET_COLS = ['序号', '岗位类型', '岗位ID', '岗位名称', '岗位链接',
+                  '职位类别', '薪资', '学历要求', '招聘人数', '工作经验',
+                  '投递简历数', '发布时间', '更新时间', '审核状态', '是否下线']
+JOB_SHEET_HIDDEN = {'更新时间', '审核状态', '是否下线'}
 
 
 # ----------------------------------------------------------------------
@@ -142,9 +144,7 @@ JOB_SHEET_HIDDEN = set()
 # ----------------------------------------------------------------------
 CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
-                  'front_cookie': '',
-                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 4,
-                  'front_rate': 1.0}               # 前台简历请求最小间隔（秒），1.0=1请求/秒
+                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 8}
 
 
 def load_config():
@@ -426,6 +426,19 @@ def company_jobs(username, include_parttime=True):
                 })
         except Exception as e:
             print('[兼职职位] 获取失败（忽略）:', e)
+    # v2.0：拿到岗位列表后，从后台 /Post/JobEdit 补抓岗位全量字段（无需前台 Cookie）
+    if out:
+        job_ids = [str(x['id']) for x in out if x.get('id')]
+        if job_ids:
+            got, stat = RF.fetch_many(
+                job_ids, CONFIG.get('cookie') or '',
+                workers=max(1, min(16, int(CONFIG.get('fetch_workers') or 8))),
+                retry_rounds=1, retry_delay=1.0, kind='job')
+            for x in out:
+                det = got.get(str(x.get('id'))) or {}
+                if det and not det.get('_error'):
+                    x['detail'] = det
+            print(f'[岗位全量] 后台 JobEdit 成功 {stat["ok"]} / 失败 {stat["fail"]}')
     return out
 
 
@@ -685,35 +698,16 @@ def parse_resume_html(html, jlid=''):
 
 def fetch_resume_detail(jlid):
     """
-    抓取并解析单份简历。
+    抓取并解析单份简历（v2.0）。
 
-    主路径：**前台简历详情页** www.hbtc.ccoo.cn/post/qiuzhi/{jlid}x.html
+    数据源：**后台简历编辑页** job.admin.ccoo.cn/Post/JlEdit?source=1&jlid={jlid}
             —— 字段最全（含工作经历1-10 / 教育经历 / 语言能力 / 证书 / 职位类别 / 现居地），
-               必须带前台登录 Cookie。
-    兜底：后台 /Post/JlEdit（字段较少，仅在前台 Cookie 未配置或失效时使用）
+               使用后台 Cookie，无需前台 Cookie。
     """
-    fc = CONFIG.get('front_cookie') or ''
-    if RF.normalize_cookie(fc):
-        d = RF.fetch_one(jlid, fc)
-        if d and not d.get('_error'):
-            return d
-    # ---- 兜底：后台编辑页 ----
-    try:
-        r = api_get('/Post/JlEdit', {'source': 1, 'jlid': jlid},
-                    timeout=30, referer=BASE_URL + '/Post/JobJlList')
-        r.encoding = 'utf-8'
-        if r.status_code != 200 or len(r.text) < 2000:
-            return {'简历ID': jlid, '简历链接': resume_link(jlid)}
-        d = parse_resume_html(r.text, jlid)
-        # 旧列名映射到新列名
-        if d.get('自我描标签') and not d.get('自我描述标签'):
-            d['自我描述标签'] = d['自我描标签']
-        if d.get('居住地') and not d.get('现居地'):
-            d['现居地'] = d['居住地']
+    d = RF.fetch_one(jlid, CONFIG.get('cookie') or '', kind='resume')
+    if d and not d.get('_error'):
         return d
-    except Exception as e:
-        print(f'[简历详情] {jlid} 失败: {e}')
-        return {'简历ID': jlid, '简历链接': resume_link(jlid)}
+    return {'简历ID': jlid, '简历链接': resume_link(jlid)}
 
 
 # ----------------------------------------------------------------------
@@ -845,7 +839,7 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
         with ThreadPoolExecutor(max_workers=workers) as ex:
             list(ex.map(one, jobs))
 
-        # 简历详情（前台简历详情页，字段最全）
+        # 简历详情（v2.0：后台 /Post/JlEdit 编辑页，全并发，无需前台 Cookie）
         if fetch_detail:
             jlids = []
             seen = set()
@@ -854,60 +848,33 @@ def run_fetch(company, jobs, fetch_detail=True, use_ocr=True, max_pages=0):
                 if jl and str(jl) not in seen:
                     seen.add(str(jl))
                     jlids.append(jl)
-            _prog(detail_total=len(jlids), msg=f'正在抓取 {len(jlids)} 份简历内容…')
+            _prog(detail_total=len(jlids),
+                  msg=f'正在抓取 {len(jlids)} 份简历内容（后台编辑页）…')
             det_map = {}
             need_login = 0
-            waf_block = 0
-            fck = CONFIG.get('front_cookie') or ''
-
-            if RF.normalize_cookie(fck) and jlids:
-                f_workers = max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
-                try:
-                    f_rate = float(CONFIG.get('front_rate') or 1.0)
-                except (TypeError, ValueError):
-                    f_rate = 1.0
+            if jlids:
+                d_workers = max(1, min(16, int(CONFIG.get('fetch_workers') or 8)))
 
                 def onp(done, total, ok, fail):
                     if done % 5 == 0 or done == total:
                         _prog(detail_done=done,
                               msg=f'简历详情 {done}/{total}（成功 {ok} / 失败 {fail}）…')
-                got, stat = RF.fetch_many(jlids, fck, workers=f_workers, on_progress=onp,
-                                          min_interval=f_rate, max_inflight=2,
-                                          waf_stop_after=3, retry_rounds=2,
-                                          retry_delay=8.0)
+
+                got, stat = RF.fetch_many(jlids, CONFIG.get('cookie') or '',
+                                          workers=d_workers, on_progress=onp,
+                                          retry_rounds=2, retry_delay=2.0,
+                                          kind='resume')
                 det_map = {str(k): v for k, v in got.items()}
                 need_login = int(stat.get('need_login') or 0)
-                waf_block = int(stat.get('waf_block') or 0)
-                print(f'[简历详情] 前台抓取 成功 {stat["ok"]} 失败 {stat["fail"]} '
-                      f'需登录 {need_login} 被拦截 {waf_block}')
-
-            # 未取到的（未配置前台 Cookie / Cookie 失效 / 个别失败）用后台页兜底
-            miss = [j for j in jlids if str(j) not in det_map]
-            if miss:
-                _prog(msg=f'有 {len(miss)} 份未取到前台详情，改用后台兜底抓取…')
-                dn = [0]
-
-                def one_detail(jl):
-                    d = fetch_resume_detail(jl)
-                    with lock:
-                        det_map[str(jl)] = d
-                        dn[0] += 1
-                        if dn[0] % 5 == 0 or dn[0] == len(miss):
-                            _prog(detail_done=len(det_map),
-                                  msg=f'兜底抓取 {dn[0]}/{len(miss)} …')
-
-                with ThreadPoolExecutor(max_workers=workers) as ex:
-                    list(ex.map(one_detail, miss))
+                print(f'[简历详情] 后台抓取 成功 {stat["ok"]} 失败 {stat["fail"]} '
+                      f'需登录 {need_login}，{stat["rounds"]} 轮')
 
             for a in apps:
                 a['detail'] = det_map.get(str(a.get('jlid')))
 
             if need_login and need_login == len(jlids):
-                _prog(msg=f'⚠ {need_login} 份简历全部返回登录页：前台 Cookie 已失效，'
-                          f'请在「连接设置」中更新前台 Cookie 后重抓')
-            elif waf_block:
-                _prog(msg=f'⚠ 有 {waf_block} 份被站点安全策略拦截，已自动熔断停止；'
-                          f'其余部分已改用后台页兜底。IP 解封需要时间，请等十几分钟后再重抓齐全。')
+                _prog(msg=f'⚠ {need_login} 份简历全部返回登录页：后台 Cookie 已失效，'
+                          f'请在「连接设置」中更新 Cookie 后重抓')
 
         _persist_ocr_cache()
 
@@ -980,7 +947,7 @@ def _style_header(ws, cols, hidden):
 
 
 def export_excel(rows, jobs, company, path, sheets=('apps', 'jobs')):
-    """导出 Excel。sheets 指定要写的工作表：'apps'=投递简历，'jobs'=岗位列表。"""
+    """导出 Excel。sheets 指定要写的工作表：'apps'=投递简历，'jobs'=岗位列表(+企业信息)。"""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font
     from openpyxl.utils import get_column_letter
@@ -1011,13 +978,20 @@ def export_excel(rows, jobs, company, path, sheets=('apps', 'jobs')):
                     EXPORT['written'] = ri - 1
         ws.auto_filter.ref = f'A1:{get_column_letter(len(COLS))}1'
 
-    # --- 工作表：岗位列表 ---
+    # --- 工作表：岗位列表（v2.0：含后台 JobEdit 全量字段） ---
     if 'jobs' in sheets:
         ws2 = wb.create_sheet('岗位列表')
         _style_header(ws2, JOB_SHEET_COLS, JOB_SHEET_HIDDEN)
         for ri, j in enumerate(jobs, 2):
-            vals = [ri - 1, j.get('type') or '', j.get('id') or '', j.get('title') or '',
-                    j.get('link') or '', j.get('countjl') or 0, j.get('systime') or '']
+            det = j.get('detail') or {}
+            vals = [ri - 1, j.get('type') or '', j.get('id') or '',
+                    j.get('title') or '', j.get('link') or '',
+                    det.get('职位类别') or '', det.get('薪资') or '',
+                    det.get('学历要求') or '', det.get('招聘人数') or '',
+                    det.get('工作经验') or '',
+                    j.get('countjl') or 0, j.get('systime') or '',
+                    det.get('更新时间') or '', det.get('审核状态') or '',
+                    det.get('是否下线') or '']
             for ci, v in enumerate(vals, 1):
                 cell = ws2.cell(row=ri, column=ci, value=clean_cell(v))
                 if ci == 5:
@@ -1028,6 +1002,30 @@ def export_excel(rows, jobs, company, path, sheets=('apps', 'jobs')):
                 with EXPORT_LOCK:
                     EXPORT['written'] = ri - 1
         ws2.auto_filter.ref = f'A1:{get_column_letter(len(JOB_SHEET_COLS))}1'
+
+        # --- 工作表：企业信息（v2.0：后台 CompanyAdd 全量字段） ---
+        if isinstance(company, dict):
+            ws3 = wb.create_sheet('企业信息')
+            comp_cols = list(RF.ADMIN_COMPANY_COLS)
+            _style_header(ws3, comp_cols, set(RF.ADMIN_COMPANY_HIDDEN))
+            cdet = company.get('detail') or {}
+            cmp_fb = {'联系电话': 'linktel', '联系人': 'linkman',
+                      '公司行业': 'ComptradeStr', '公司规模': 'CompSizeStr',
+                      '区域': 'AreaStr', '发布职位数': 'jobCount',
+                      '注册时间': 'SysTime', 'VIP类型': 'VipType'}
+            rowv = []
+            for c in comp_cols:
+                if c == '企业ID':
+                    v = company.get('id') or company.get('companyId') or ''
+                elif c == '企业名称':
+                    v = company.get('CompName') or ''
+                elif c == '企业用户名':
+                    v = company.get('username') or ''
+                else:
+                    v = cdet.get(c) or company.get(cmp_fb.get(c, ''), '') or ''
+                rowv.append(clean_cell(v))
+            ws3.append(rowv)
+            ws3.auto_filter.ref = f'A1:{get_column_letter(len(comp_cols))}1'
 
     if not wb.sheetnames:
         wb.create_sheet('空')
@@ -1148,17 +1146,12 @@ def api_config_set():
     global CONFIG
     d = request.get_json(force=True, silent=True) or {}
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'front_cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
         if 'fetch_workers' in d:
             try:
-                CONFIG['fetch_workers'] = max(1, min(8, int(d['fetch_workers'])))
-            except (TypeError, ValueError):
-                pass
-        if 'front_rate' in d:
-            try:
-                CONFIG['front_rate'] = min(5.0, max(0.0, float(d['front_rate'])))
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
             except (TypeError, ValueError):
                 pass
         if 'ocr_scale' in d:
@@ -1186,17 +1179,12 @@ def api_config_import():
     if not isinstance(d, dict):
         return jsonify({'ok': False, 'msg': '不是有效的 JSON 配置文件'})
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'front_cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
         if 'fetch_workers' in d:
             try:
-                CONFIG['fetch_workers'] = max(1, min(8, int(d['fetch_workers'])))
-            except (TypeError, ValueError):
-                pass
-        if 'front_rate' in d:
-            try:
-                CONFIG['front_rate'] = min(5.0, max(0.0, float(d['front_rate'])))
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
             except (TypeError, ValueError):
                 pass
         if 'ocr_scale' in d:
@@ -1271,20 +1259,8 @@ def api_test_cookie():
 
 @app.route('/api/front_test', methods=['POST'])
 def api_front_test():
-    """测试「前台 Cookie」是否可用于抓取简历详情页"""
-    global CONFIG
-    d = request.get_json(force=True, silent=True) or {}
-    ck = d.get('front_cookie')
-    if ck is None:
-        ck = CONFIG.get('front_cookie', '')
-    ck = str(ck)
-    ok, msg, sample = RF.test_front_cookie(ck)
-    if ok and ck:
-        with CONFIG_LOCK:
-            CONFIG['front_cookie'] = ck
-            save_config(CONFIG)
-            CONFIG = load_config()
-    return jsonify({'ok': ok, 'msg': msg, 'sample': sample})
+    """已废弃（v2.0 不需要前台 Cookie）。返回占位，避免旧界面报错。"""
+    return jsonify({'ok': False, 'msg': 'v2.0 已不再需要前台 Cookie，详情全部从后台编辑页抓取'})
 
 
 @app.route('/api/search_company', methods=['POST'])
@@ -1312,12 +1288,19 @@ def api_company_jobs():
         return jsonify({'ok': False, 'msg': '缺少企业用户名'})
     try:
         jobs = company_jobs(username, include_parttime=bool(d.get('include_parttime', True)))
+        company = d.get('company') or {'username': username}
+        # v2.0：从后台 /Enterprise/CompanyAdd 补抓企业全量字段
+        cid = company.get('id') or company.get('companyId')
+        if cid:
+            cdet = RF.fetch_one(cid, CONFIG.get('cookie') or '', kind='company')
+            if cdet and not cdet.get('_error'):
+                company['detail'] = cdet
         with STATE_LOCK:
-            STATE['company'] = d.get('company') or {'username': username}
+            STATE['company'] = company
             STATE['jobs'] = jobs
             STATE['apps'] = []
         save_state()
-        return jsonify({'ok': True, 'jobs': jobs})
+        return jsonify({'ok': True, 'jobs': jobs, 'company': company})
     except Exception as e:
         traceback.print_exc()
         return jsonify({'ok': False, 'msg': f'获取职位失败: {e}'})

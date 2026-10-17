@@ -6,13 +6,15 @@
 一个 exe / 一个端口，集成两个工具（门户 + 两个子面板）：
 
   /      综合面板首页（门户导航）
-  /city  平台数据面板 —— 7 类目全量抓取 + 电话图片 OCR + 简历全量字段补抓
+  /city  平台数据面板 —— 7 类目全量抓取 + 电话图片 OCR + 简历/岗位/企业/用户全量字段补抓
   /jd    企业投递简历采集面板 —— 企业 → 岗位 → 投递简历 → 完整简历内容
 
 运行：python 面板.py    （自动打开 http://127.0.0.1:8795）
 
-  * 配置共享：根目录 config.json —— 后台 Cookie / 前台 Cookie / 保存目录只需填一次
+  * 配置共享：根目录 config.json —— 后台 Cookie / 总后台 Cookie / 保存目录只需填一次
   * 数据分存：数据_平台面板/ 与 数据_简历面板/ 互不干扰
+  * 详情来源：简历 JlEdit / 岗位 JobEdit / 企业 CompanyAdd（job.admin.ccoo.cn，后台 Cookie）
+              用户 user_set.asp（www.admin.ccoo.cn，总后台 Cookie，纯文本无需 OCR）
 """
 
 import os
@@ -25,7 +27,7 @@ sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 源码模式：保证 panels 包与 resume_front 可导入
+# 源码模式：保证 panels 包与 admin_detail 可导入
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 

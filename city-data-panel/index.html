@@ -124,7 +124,7 @@
       <ul class="list">
         <li><b>7 类目全量抓取</b>：订单管理、全职岗位、兼职岗位、企业库、会员企业、简历库、注册用户。</li>
         <li><b>电话图片 OCR</b>：简历库的 <code>tel</code>、注册用户的 <code>mobile</code> 是 base64 内嵌图（前缀写 png 实为 JPEG），自动识别成可复制文本。</li>
-        <li><b>简历全量字段补抓</b>：列表接口只给「简历摘要」，面板再逐份打开前台简历详情页，把<b>工作经历、教育经历、语言能力、获得证书</b>等完整内容补进同一张表（简历库 91 列 → 116 列）。</li>
+        <li><b>详情全量字段补抓</b>：列表接口只给摘要，面板按 ID 打开<b>后台编辑页</b>补全——简历 JlEdit（工作经历/教育经历/语言能力/获得证书）、岗位 JobEdit、企业 CompanyAdd、用户 user_set.asp（总后台，纯文本无需 OCR）。</li>
         <li><b>勾选式导出</b>：单类目导出一个 <code>.xlsx</code>，多类目自动打包成一个 <code>.zip</code>，文件名自动带类目与时间戳。</li>
         <li><b>字段完整 + 智能隐藏</b>：保留接口返回的全部字段（两行表头：英文 / 中文），对照参考 Excel 把次要列设为隐藏列。</li>
         <li><b>脏数据清洗</b>：自动剔除 Excel 不支持的控制字符（如昵称里的 <code>\x0e</code> 之类），超长文本截断到 32767 字符。</li>
@@ -149,7 +149,7 @@
           <tr><td>兼职岗位</td><td class="mono"><code>/Post/GetJZ_YZJobList</code></td><td class="num">23</td><td>兼职岗位列表</td></tr>
           <tr><td>企业库</td><td class="mono"><code>/Enterprise/GetCompanyListData</code></td><td class="num">4,735</td><td>全量企业主体</td></tr>
           <tr><td>会员企业</td><td class="mono"><code>/Enterprise/GetEnterpriseData</code></td><td class="num">198</td><td>付费会员企业</td></tr>
-          <tr><td>简历库</td><td class="mono"><code>/Post/GetPostJlList</code></td><td class="num">15,733</td><td><b>tel 字段为 base64 图片</b>，需 OCR；完整简历另需前台详情页</td></tr>
+          <tr><td>简历库</td><td class="mono"><code>/Post/GetPostJlList</code></td><td class="num">15,733</td><td><b>tel 字段为 base64 图片</b>，需 OCR；完整简历另需后台编辑页 JlEdit</td></tr>
           <tr><td>注册用户</td><td class="mono"><code>/Customer/GetUserInfoList</code></td><td class="num">73,046</td><td><b>mobile 字段为 base64 图片</b>，需 OCR</td></tr>
         </tbody>
       </table>
@@ -164,15 +164,15 @@
   <div class="wrap">
     <h2>使用流程</h2>
     <div class="grid2">
-      <div class="mini"><h4>① 填登录信息</h4><p>在「配置」区填写后台账号密码，或直接粘贴登录后的 Cookie。点「测试」验证是否仍有效。</p></div>
-      <div class="mini"><h4>② 填前台 Cookie</h4><p>想连<b>简历完整内容</b>一起抓，就再粘贴前台站点 <code>www.hbtc.ccoo.cn</code> 的 Cookie，点「测试前台 Cookie」验证。</p></div>
-      <div class="mini"><h4>③ 开始抓取</h4><p>点击「开始抓取」，面板会并发分页拉取全部类目；勾选「同时补抓简历详情」后简历库会自动续抓前台内容。</p></div>
+      <div class="mini"><h4>① 填登录信息</h4><p>在「配置」区填写后台账号密码，或直接粘贴登录后的后台 Cookie（job.admin.ccoo.cn）。点「测试」验证是否仍有效。</p></div>
+      <div class="mini"><h4>② 填总后台 Cookie</h4><p>想连<b>注册用户全量字段</b>一起抓，再粘贴总后台 <code>www.admin.ccoo.cn</code> 的 Cookie，点「测试总后台 Cookie」验证（可留空）。</p></div>
+      <div class="mini"><h4>③ 开始抓取</h4><p>点击「开始抓取」，面板会并发分页拉取全部类目；勾选「同时补全后台全量字段」后自动按 ID 打开编辑页补抓详情。</p></div>
       <div class="mini"><h4>④ 浏览与筛选</h4><p>抓取完成后可在页面按类目查看数据、翻页、关键字过滤（可按简历库的姓名 / 现居地 / 期望职位筛选）。</p></div>
       <div class="mini"><h4>⑤ 勾选导出</h4><p>在导出区勾选类目（支持全选/全不选/反选/只选已抓取），选择保存目录后导出。</p></div>
     </div>
     <div class="note">
-      <b>只想补简历详情？</b>列表已经抓过了，不用重跑。在简历库那一行点「<b>只补抓简历库详情</b>」按钮即可：
-      它会复用已有列表，仅逐份补抓前台简历内容并回写缓存。若只想试抓一小批，把「详情条数上限」填成 40 之类的数字即可，
+      <b>只想补抓详情？</b>列表已经抓过了，不用重跑。在各行点「<b>只补缺失</b>」按钮即可：
+      它会复用已有列表，按 ID 打开后台编辑页补抓详情并回写缓存。若只想试抓一小批，把「详情条数上限」填成 40 之类的数字即可，
       留 <code>0</code> 表示不限。
     </div>
   </div>
@@ -180,28 +180,32 @@
 
 <section>
   <div class="wrap">
-    <h2>简历库的「全量简历内容」是怎么拿到的</h2>
-    <p class="lead">这是 v1.3.0 的主要改动：列表接口只能给摘要，完整简历得换一条路取。</p>
+    <h2>简历库的「全量简历内容」是怎么拿到的（v2.0）</h2>
+    <p class="lead">v2.0 起，简历详情改从<b>后台编辑页</b>抓取：不再抓前台网站，不再需要前台 Cookie。</p>
 
     <div class="panel">
       <p>
-        简历库列表接口 <code>/Post/GetPostJlList</code> 返回的是<b>列表级字段</b>——身份证式的姓名性别年龄、学历、期望职位、
-        电话图片等等，够做筛选和统计，但<b>不含简历正文</b>。真正的完整简历（做过哪些公司、什么时间段、读了什么学校、
-        有什么证书和语言能力、自我描述全文）只存在于<b>前台简历详情页</b>：
+        简历库列表接口 <code>/Post/GetPostJlList</code> 返回的是<b>列表级字段</b>——姓名性别年龄、学历、期望职位、
+        电话图片等等，够做筛选和统计，但<b>不含简历正文</b>。完整的简历（工作经历、教育经历、语言能力、获得证书）
+        存在于<b>后台编辑页</b>：
       </p>
-      <p><code>http://www.hbtc.ccoo.cn/post/qiuzhi/{简历ID}x.html</code></p>
+      <p><code>http://job.admin.ccoo.cn/Post/JlEdit?source=1&amp;jlid={简历ID}</code></p>
       <p>
-        这个页面是服务端渲染的完整简历，但它<b>必须带前台站点的登录 Cookie</b>：不带 Cookie（或只带后台 Cookie）会返回一个约 22 KB
-        的登录页，里面没有任何简历内容——这就是「拿到了列表、却没有简历全量数据」的根因。
-        所以面板把两种 Cookie 分开配置：<b>后台 Cookie</b> 管 7 个类目的接口，<b>前台 Cookie</b> 只管逐份打开简历详情页。
+        该页是服务端渲染的完整简历表单，携带<b>后台 Cookie</b>（<code>cookie</code>）即可访问，字段比前台更全。
+        v2.0 全面切换为后台编辑页后，<b>不再需要前台站点 Cookie</b>，也没有前台 nginx WAF，抓取为<b>全并发</b>。
+      </p>
+      <p>
+        <b>同理，其他类目也一并切到后台编辑页：</b>岗位（全职+兼职）→ <code>/Post/JobEdit?Source=1&amp;id={岗位ID}</code>；
+        企业 → <code>/Enterprise/CompanyAdd?source=1&amp;companyId={企业ID}</code>；
+        注册用户 → 总后台 <code>www.admin.ccoo.cn/yunying/users/user_set.asp?id={用户ID}</code>（纯文本表格，无需 OCR）。
       </p>
       <div class="note">
-        <b>前台 Cookie 怎么取？</b>浏览器登录 <code>http://www.hbtc.ccoo.cn</code> → 按 F12 → Network → 点任意请求 →
-        复制 Request Headers 里的整条 <code>Cookie</code> → 粘到面板「前台 Cookie」框 → 点「测试前台 Cookie」。
-        面板会用一份真实简历探测，返回「姓名 + 若干字段」即通过。
+        <b>总后台 Cookie 怎么取？</b>浏览器登录 <code>http://www.admin.ccoo.cn</code> → 按 F12 → Network → 点任意请求 →
+        复制 Request Headers 里的整条 <code>Cookie</code> → 粘到面板「总后台 Cookie」框 → 点「测试总后台 Cookie」
+        （面板用指定用户探测，返回用户名/注册IP等即通过）。总后台 Cookie 仅「注册用户」全量字段需要，可留空。
       </div>
       <p>
-        <b>坑一（务必知道）：</b>这条 Cookie 串只能用分号 <code>;</code> 切分，<b>不能按 <code>&amp;</code> 切</b>。
+        <b>坑一（务必知道）：</b>Cookie 串只能用分号 <code>;</code> 切分，<b>不能按 <code>&amp;</code> 切</b>。
         站点里 <code>ccoo=logintime=…&amp;uid=…</code>、<code>ccoocitycrm=pass&amp;crm_username=…</code> 这些 Cookie 的
         <b>值本身就含 <code>&amp;</code></b>，按 <code>&amp;</code> 拆会把它们截断，认证随即失效，页面又变回登录页。
       </p>
@@ -212,7 +216,7 @@
     </div>
 
     <h3>补抓后多了哪些列</h3>
-    <p>简历库导出从 <b>91 列</b> 扩到 <b>116 列</b>，新增 25 列：</p>
+    <p>简历库导出新增 <b>25 列</b>：</p>
     <div class="tbl-wrap">
       <table>
         <thead><tr><th style="width:26%">新增字段</th><th style="width:14%">列数</th><th>说明</th></tr></thead>
@@ -226,47 +230,35 @@
     </div>
     <p>
       另外，<b>姓名、性别、年龄、学历、工作经验、现居地、求职状态、期望职位、职位类别、期望月薪、自我描述标签、自我描述详情</b>
-      这 12 个前台字段在列表里本来就有，补抓时只做覆盖校准，不新增列。
+      这 12 个字段在列表里本来就有，补抓时只做覆盖校准，不新增列。
     </p>
     <p>
-      导出时默认隐藏 <b>14 列</b>次要列（工作经历 7-10、教育经历 3-5、语言能力 2-5、获得证书 3-5），
-      表更清爽；需要时在 Excel 里取消隐藏即可。
+      岗位（全职+兼职）新增 <b>25 列</b>（职位类别/学历/人数/经验/描述/公司信息等）、企业新增 <b>24 列</b>
+      （联系人/电话/简介/行业/规模/认证/到期时间等）、注册用户新增 <b>33 列</b>
+      （用户名/昵称/注册IP/账号状态/论坛信息/会员服务/用户链接等）。
+    </p>
+    <p>
+      导出时默认隐藏若干次要列，表更清爽；需要时在 Excel 里取消隐藏即可。
     </p>
 
-    <h3>实测性能与反爬限速（v1.3.0 重点）</h3>
-    <div class="note" style="background:#fff1f0;border-color:#f7cdc8;border-left-color:#d9534f;color:#7d3b36">
-      <b style="color:#b33b34">真实事故：8 线程快抓 200 份，只成功 120 份。</b>
-      前台简历页 <code>/post/qiuzhi/{id}x.html</code> 前方是 nginx WAF。用 8 线程、不限间隔连抓 200 份时，
-      <b>只有 120 份成功、80 份失败</b>，而且失败的全部集中在后半段——导出的表里后 80 行整片空白，
-      看起来就像「只拿到了后台的部分数据」。事后用 1 请求/秒限速重抓，<b>那 80 份全部成功</b>，
-      200 份全量只用 256 秒。可见 WAF 拦的是<b>累计请求量</b>，不是瞬时并发。
-      实测约在第 120 份开始返回带滑动验证的 <code>403</code>（文案「疑似异常访问请求，已被系统拦截 / IP频繁访问」），
-      之后<b>本机 IP 会被临时拉黑十几分钟</b>，连正常请求也一起 403。
-    </div>
+    <h3>后台详情补抓机制（v2.0）</h3>
     <ul class="list">
-      <li><b>默认限速 1 请求/秒</b>：全局令牌桶强制「任意两次前台请求至少间隔 <code>front_rate</code> 秒」，默认 <code>1.0</code>。</li>
-      <li><b>并发上限 2</b>：同时在途连接数被信号量卡住。把「抓取线程」调大也不会变快——速率由间隔决定，调大反而更容易触发拦截。</li>
-      <li><b>失败自动补抓</b>：一轮跑完后，对失败的简历<b>自动再跑 2 轮</b>（轮间等 8 秒），直到抓全。</li>
-      <li><b>WAF 熔断</b>：连续 3 次被拦截就立即停止本批，并给出提示，避免把 IP 打进更长时间的黑名单。</li>
+      <li><b>全并发抓取</b>：后台编辑页无前台 WAF，不再需要令牌桶限速 / 请求间隔；<code>fetch_workers</code> 默认 <code>8</code>，调大即提速。</li>
+      <li><b>失败自动补抓</b>：一轮跑完后，对失败的详情<b>自动再跑 2 轮</b>，直到抓全。</li>
+      <li><b><code>need_login</code> 单独统计</b>：Cookie 失效导致的失败单独统计并明确提示，而不是混在普通失败里。</li>
       <li><b>只补缺失详情</b>：中断后点这个按钮，<b>跳过已有详情</b>、只抓空缺的那些，不必重跑已有部分。</li>
-      <li><b>命中即短路</b>：识别到验证页立刻返回，不重试不睡眠，避免无谓请求加重封禁。</li>
       <li><b>结果落盘</b>：抓完直接回写 <code>data_cache/简历库.json</code>，下次导出无需重抓。</li>
     </ul>
     <div class="note">
       <b>怎么确认「拿到了全量」：</b>补抓结束时面板会直接报告<b>覆盖率</b>，例如
-      「简历详情 成功 200 / 失败 0，<b>详情覆盖 200/200</b>，新增 39 列」；抓取过程中也实时显示
-      「<b>当前详情覆盖 120/200</b>」。<b>覆盖数 = 总行数</b>就说明每一份简历都取到了前台详情。
-      若显示「成功 120 / 失败 80」，说明被拦了，隔十几分钟点「<b>只补缺失详情</b>」续抓即可。
+      「简历详情 成功 200 / 失败 0，<b>详情覆盖 200/200</b>」；抓取过程中也实时显示
+      「<b>当前详情覆盖 120/200</b>」。<b>覆盖数 = 总行数</b>就说明每一份都取到了后台详情。
+      若提示 <code>need_login</code>，说明 Cookie 失效，重新粘贴后点「<b>只补缺失详情</b>」续抓即可。
     </div>
     <div class="note">
       <b>字段空缺不等于抓取失败：</b>200 份全量成功后的真实填充率为——姓名/性别/年龄/自我描述详情
       <b>100%</b>、学历 99%、工作经历 1 <b>55%</b>、头像 53%、现居地 45%、教育经历 1 37%、
-      获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，前台页面本身就没有那个区块。
-    </div>
-    <div class="note">
-      <b>预期耗时：</b>按 1 请求/秒算，200 份约 4 分钟、500 份约 8 分钟、15,733 份全量约 4–5 小时。
-      这是不被封 IP 的前提下比较稳妥的节奏；如果只是想看效果，把「详情条数上限」填 <code>40</code> 试跑即可。
-      确实需要更快时可以把 <code>front_rate</code> 调到 <code>0.5</code>（2 请求/秒），但要自己承担被拦截的风险。
+      获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，后台表单里本身就没有那个区块。
     </div>
   </div>
 </section>
@@ -303,13 +295,14 @@
       导出完成后会提示「已自动清洗 N 处非法字符 / 超长文本」。
     </p>
 
-    <h3>简历详情页的解析要点</h3>
+    <h3>后台编辑页的解析要点</h3>
     <p>
-      前台简历页里「工作经历 / 教育经历 / 语言能力 / 获得证书」四个区块<b>用的是同一个 class</b>
-      （<code>j-work-module clearfix step-circle</code>），直接按 class 抓会把证书、语言块当成工作经历
-      （实测出现过「工作经历6 = 心理健康指导」这种错位）。所以解析时先按小节标题
-      <code>&lt;p class="j-tit-module"&gt;工作经历&lt;/p&gt;</code> 定位到区块，再只在区块内匹配条目。
-      另外两处细节：时间段节点本身已自带括号，要避免再包一层变成 <code>（（2019.6-2020.8））</code>；
+      详情页均为服务端渲染的 HTML 表单/表格：简历 JlEdit、岗位 JobEdit、企业 CompanyAdd 是
+      <code>&lt;td&gt;</code> 标签 → 下一 <code>&lt;td&gt;</code> 值的结构，按字段标签定位取值；
+      用户 user_set.asp 是 <code>td.align=right</code> 标签 → 下一 <code>td</code> 值的表格结构，
+      注册IP 值形如 <code>117.154.28.195[查看IP所在地]</code>（自动去掉 <code>[...]</code> 后缀）、
+      会员年龄 <code>31岁（生日：1995/1/1）</code>（自动拆出年龄+生日）、
+      会员服务 8 项状态（房屋中介/名企招聘/论坛登录/车行/二手商家/新楼盘管理/分类信息发布/微信登录）逐项合并。
       正文里的 <code>&lt;br&gt;</code> 统一转成换行、并反转义 HTML 实体，保证 Excel 里是可读的多行文本。
     </p>
 
@@ -337,7 +330,7 @@
 ├── README.md
 └── src/
     ├── 面板.py                    # 主程序（Flask 服务 + 抓取 + 导出）
-    ├── resume_front.py            # 前台简历详情抓取与解析（两个项目共用）
+    ├── admin_detail.py            # 后台详情抓取模块（JlEdit / JobEdit / CompanyAdd / user_set.asp，三个项目共用同一份）
     ├── static/
     │   └── index.html             # 面板前端页面
     ├── 打包exe.py                 # 一键 PyInstaller 打包脚本
@@ -359,12 +352,11 @@ pip install flask requests beautifulsoup4 lxml rapidocr_onnxruntime openpyxl onn
 # 2) 准备配置（首次）
 cd src
 copy config.example.json config.json
-#   cookie            = 后台 Cookie（7 个类目接口）
-#   front_cookie      = 前台 Cookie（简历全量内容，必填才有工作/教育/语言/证书）
-#   fetch_resume_detail = 1 抓简历详情 / 0 只抓列表
+#   cookie            = 后台 Cookie（7 个类目接口 + 简历/岗位/企业详情）
+#   master_cookie     = 总后台 Cookie（注册用户全量字段，可留空）
+#   fetch_resume_detail = 1 抓详情 / 0 只抓列表
 #   resume_detail_limit = 0 不限条数，填 N 则只补抓前 N 份
-#   fetch_workers     = 详情并发线程数（1-8，默认 4；受限速约束，调大不会更快）
-#   front_rate        = 前台简历请求最小间隔（秒），默认 1.0 = 1 请求/秒
+#   fetch_workers     = 列表/详情并发线程数（默认 8；后台无 WAF，调大即提速）
 
 # 3) 启动
 python -X utf8 面板.py
@@ -396,10 +388,14 @@ python 打包exe.py
       <p>Cookie 有时效。在面板里重新登录一次，或粘贴最新的 Cookie，点「测试」确认通过后再抓取。</p>
 
       <h3>简历库抓完了，但没有工作经历 / 教育经历？</h3>
-      <p>那是<b>前台 Cookie 没配</b>（或已过期）。列表接口本身不含简历正文，补抓详情必须带前台站点的登录 Cookie。
-        配好前台 Cookie 后，点简历库行的「只补抓简历库详情」，不必重新抓列表。</p>
+      <p>那是<b>后台 Cookie 没配</b>（或已过期）。列表接口本身不含简历正文，补抓详情必须带后台 Cookie 访问编辑页 JlEdit。
+        配好后点简历库行的「只补缺失」，不必重新抓列表。</p>
 
-      <h3>前台 Cookie 测试提示「返回登录页」？</h3>
+      <h3>注册用户抓完了，但没有全量字段？</h3>
+      <p>那是<b>总后台 Cookie 没配</b>（或已过期）。用户全量字段来自总后台 <code>user_set.asp</code>，配好
+        <code>master_cookie</code> 后点「只补缺失」即可，无需重抓列表。</p>
+
+      <h3>测试总后台 Cookie 报错？</h3>
       <p>三种常见原因：① Cookie 已过期，重新登录复制；② 复制时漏了后半段（整串很长，注意别只复制到分号处）；
         ③ 粘贴时被换行 / 空格截断——面板会自动去掉首尾空白并按分号重组，但仍建议整串一次性粘贴。
         若你的电脑开着代理，请确认 <code>127.0.0.1</code> 未被代理接管（面板已尽量规避）。</p>

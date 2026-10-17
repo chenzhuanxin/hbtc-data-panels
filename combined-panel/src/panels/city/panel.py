@@ -12,6 +12,12 @@
   4. Excel 导出：勾选类目、选择目录、自动命名；单类目=一个 xlsx，多类目=zip 包
   5. Excel 保留全部字段，次要字段自动隐藏列（对照参考 Excel 的隐藏配置）
   6. 账号/密码/Cookie 保存在本目录 config.json，支持导入/导出
+
+v2.0 数据源切换（详见 admin_detail.py）：
+  * 简历全量 ← 后台 /Post/JlEdit；岗位全量 ← 后台 /Post/JobEdit
+  * 企业全量 ← 后台 /Enterprise/CompanyAdd；用户全量 ← 总后台 /yunying/users/user_info.asp
+  * 不再需要前台 Cookie；用户全量需要「总后台 Cookie」（www.admin.ccoo.cn）
+  * 后台页面无前台 WAF 限速，详情补抓全并发，速度大幅提升；OCR 保持不变
 """
 
 import os
@@ -30,7 +36,7 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 
-import resume_front as RF
+import admin_detail as RF
 
 sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
 sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
@@ -53,7 +59,7 @@ def _combo_root():
 # 本模块是「综合数据面板」的内置子面板（源自独立项目的 面板.py）：
 #   * static 资源放在本模块同目录，源码 / exe 解包后路径一致
 #   * 配置文件与综合面板共享（根目录 config.json，两个子面板的键完全兼容，
-#     后台 Cookie / 前台 Cookie / 保存目录 只需填一次）
+#     后台 Cookie / 总后台 Cookie / 保存目录 只需填一次）
 #   * 各自的抓取缓存放在独立子目录，互不干扰
 # ----------------------------------------------------------------------
 RES_DIR = BASE_DIR
@@ -321,10 +327,9 @@ UNAVAILABLE = {'账户订单管理': '接口不可用（与订单管理相同数
 # ----------------------------------------------------------------------
 CONFIG_LOCK = threading.RLock()
 DEFAULT_CONFIG = {'username': '', 'password': '', 'cookie': '',
-                  'front_cookie': '',
-                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 4,
-                  'front_rate': 3.0,               # 前台岗位/简历请求最小间隔（秒），3.0≈0.33请求/秒，低速防WAF拉黑
-                  'fetch_resume_detail': 1,        # 简历库是否补抓前台简历详情
+                  'master_cookie': '',             # 总后台 www.admin.ccoo.cn Cookie（用户全量字段必需）
+                  'save_dir': '', 'ocr_scale': 1, 'fetch_workers': 8,
+                  'fetch_resume_detail': 1,        # 抓取类目时是否同步从后台编辑页补全全量字段
                   'resume_detail_limit': 0}        # 0 = 不限条数
 
 
@@ -718,6 +723,14 @@ def fetch_category(cat, max_pages=0, use_ocr=True, with_detail=True):
             detail_info = enrich_job_details(cat)
             with DATA_LOCK:
                 rows = DATA[cat]['rows']
+        elif cat in ('企业库', '会员企业') and with_detail:
+            detail_info = enrich_company_details(cat)
+            with DATA_LOCK:
+                rows = DATA[cat]['rows']
+        elif cat == '注册用户' and with_detail:
+            detail_info = enrich_user_details(cat)
+            with DATA_LOCK:
+                rows = DATA[cat]['rows']
 
         _set_progress(cat, phase='done', pages_done=pages_seen, rows=len(rows),
                       ocr_total=ocr_total,
@@ -738,13 +751,15 @@ def fetch_category(cat, max_pages=0, use_ocr=True, with_detail=True):
 
 
 # ----------------------------------------------------------------------
-# 简历库：补抓「前台简历详情」全量字段
+# 通用详情补抓引擎（v2.0：后台/总后台编辑页全量字段）
 #
-# 列表接口 /Post/GetPostJlList 只给列表级字段（电话还是图片，需 OCR）；
-# 完整简历内容（工作经历 1-10 / 教育经历 1-5 / 语言能力 1-5 / 获得证书 1-5 /
-# 职位类别 / 现居地 / 自我描述标签与详情 …）只能来自前台简历详情页
-#     http://www.hbtc.ccoo.cn/post/qiuzhi/{id}x.html
-# 该页**必须带前台登录 Cookie**（无 Cookie 会返回登录页）。
+# 列表接口只给列表级字段（简历库电话还是图片，需 OCR）；
+# 全量字段由后台编辑页补充：
+#   简历  → /Post/JlEdit?source=1&jlid={id}         （用后台 Cookie）
+#   岗位  → /Post/JobEdit?Source=1&id={id}          （用后台 Cookie）
+#   企业  → /Enterprise/CompanyAdd?source=1&companyId={id}（用后台 Cookie）
+#   用户  → www.admin.ccoo.cn/yunying/users/user_info.asp?id={id}（用总后台 Cookie）
+# 后台页面无前台 WAF，补抓全并发，速度大幅提升；OCR 保持不变。
 # ----------------------------------------------------------------------
 DETAIL_COLS = list(RF.DETAIL_COLS)
 
@@ -754,16 +769,39 @@ RESUME_DETAIL_HIDDEN = {'照片', '工作经历7', '工作经历8', '工作经�
                         '语言能力2', '语言能力3', '语言能力4', '语言能力5',
                         '获得证书3', '获得证书4', '获得证书5'}
 
-# 岗位前台详情列（参照简历：从 /post/zhaopin/{id}x.html 补抓全量字段）
-JOB_DETAIL_COLS = list(RF.JOB_DETAIL_COLS)
-JOB_DETAIL_HIDDEN = set(RF.JOB_DETAIL_HIDDEN)
+# 岗位 / 企业 / 用户详情列（后台编辑页全量字段）
+JOB_DETAIL_COLS = list(RF.ADMIN_JOB_COLS)
+JOB_DETAIL_HIDDEN = set(RF.ADMIN_JOB_HIDDEN)
+COMPANY_DETAIL_COLS = list(RF.ADMIN_COMPANY_COLS)
+COMPANY_DETAIL_HIDDEN = set(RF.ADMIN_COMPANY_HIDDEN)
+USER_DETAIL_COLS = list(RF.ADMIN_USER_COLS)
+USER_DETAIL_HIDDEN = set(RF.ADMIN_USER_HIDDEN)
+
+# 各类目判断“是否已有详情”的锚点列（详情页 100% 有值，且列表列中没有）
+DETAIL_ANCHOR = {'简历库': '姓名', '全职岗位': '岗位标题', '兼职岗位': '岗位标题',
+                 '企业库': '企业名称', '会员企业': '企业名称', '注册用户': '家乡通ID'}
 
 
-def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missing=False):
-    """给简历库补抓前台简历详情，结果作为新列追加到每行末尾。
+def _detail_val(v, ocr_fn=None):
+    """详情值落表前处理：base64 图片电话走 OCR（保留 OCR 能力），URL 原样。"""
+    if v is None:
+        return ''
+    s = str(v)
+    if s.startswith('data:image'):
+        return (clean_text(ocr_fn(s)) if ocr_fn else '[图片]')
+    return s
 
-    only_missing=True 时**跳过已经有详情的行**，只补那些还空着的
-    （用于被 WAF 熔断中断后，稍后续抓剩下的部分，不必重跑全部）。
+
+def _enrich_category(cat, kind, detail_cols, anchor, ck, label, only_missing=False,
+                     ocr_fn=None):
+    """通用详情补抓：按 id 从后台/总后台编辑页抓全量字段，追加为新列。
+
+    kind        : 'resume' / 'job' / 'company' / 'user'（见 admin_detail）
+    detail_cols : 详情列集合
+    anchor      : 判断“是否已有详情”的锚点列
+    ck          : 使用的 Cookie（后台 cookie 或总后台 master_cookie）
+    label       : 展示用名称（如「简历」「岗位」「企业」「用户」）
+    only_missing=True 时跳过已有详情的行（断点续抓）。
 
     返回一段用于展示的说明文本。
     """
@@ -776,23 +814,14 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missin
         fetched_at = d.get('fetched_at') or time.time()
 
     if 'id' not in cols:
-        return '（该类目无 id 字段，跳过简历详情）'
-
-    fck = CONFIG.get('front_cookie') or ''
-    if not RF.normalize_cookie(fck):
-        return '（未配置前台 Cookie，已跳过简历详情；配置后可获取完整简历内容）'
+        return f'（该类目无 id 字段，跳过{label}详情）'
+    if not RF.normalize_cookie(ck):
+        return f'（未配置{label}详情所需 Cookie，已跳过；配置后可获取全量{label}内容）'
 
     idx = cols.index('id')
-    # 判断"是否已有详情"的锚点列：姓名（前台详情 100% 有值）
-    name_idx = cols.index('姓名') if '姓名' in cols else None
+    name_idx = cols.index(anchor) if anchor in cols else None
 
-    # 起始覆盖率：以「姓名」为锚点，统计已带详情的行数（含未去重前）
-    already = 0
-    if name_idx is not None:
-        already = sum(1 for r in rows
-                      if name_idx < len(r) and str(r[name_idx] or '').strip())
-
-    jlids, seen, skipped = [], set(), 0
+    objids, seen, skipped = [], set(), 0
     for r in rows:
         rid = r[idx] if idx < len(r) else ''
         s = '' if rid in (None, '') else str(rid).strip()
@@ -804,76 +833,62 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missin
             if has:
                 skipped += 1
                 continue
-        jlids.append(s)
+        objids.append(s)
 
-    if limit is None:
-        try:
-            limit = int(CONFIG.get('resume_detail_limit') or 0)
-        except (TypeError, ValueError):
-            limit = 0
+    try:
+        limit = int(CONFIG.get('resume_detail_limit') or 0)
+    except (TypeError, ValueError):
+        limit = 0
     if limit and limit > 0:
-        jlids = jlids[:limit]
+        objids = objids[:limit]
 
-    if not jlids:
+    if not objids:
         if only_missing and skipped:
-            return f'（全部 {skipped} 份都已有详情，无需补抓）'
+            return f'（全部 {skipped} 个都已有详情，无需补抓）'
         return ''
 
-    workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
-    try:
-        rate = float(CONFIG.get('front_rate') or 3.0)
-    except (TypeError, ValueError):
-        rate = 1.0
-    total = len(jlids)
-    n_rows = len(rows)
-    # 补抓期间对外显示的"覆盖"数：已有 + 本轮新增（回填模式下总数不变）
-    base = already if only_missing else 0
-    est = total * max(rate, 0.05)
-    print(f'[简历详情] 开始抓取 {total} 份（跳过已有 {skipped} 份；'
-          f'{workers} 线程，间隔 {rate}s ≈ {1.0 / max(rate, 0.01):.1f} 请求/秒，'
-          f'预计 {int(est // 60)} 分 {int(est % 60)} 秒）…')
-    _set_progress(cat, msg=f'正在抓取 {total} 份简历详情（前台页）…'
-                           f'当前详情覆盖 {base}/{n_rows}',
-                  detail_done=base, detail_total=n_rows)
+    workers = max(1, min(16, int(CONFIG.get('fetch_workers') or 8)))
+    total = len(objids)
+    print(f'[{label}详情] 开始抓取 {total} 个（{workers} 线程全并发，'
+          f'跳过已有 {skipped} 个）…')
+    _set_progress(cat, msg=f'正在抓取 {total} 个{label}详情（后台编辑页）…',
+                  detail_done=0, detail_total=total)
 
     def onp(done, tot, ok, fail):
         if done % 10 == 0 or done == tot:
-            _set_progress(cat, detail_done=min(n_rows, base + done),
-                          detail_total=n_rows,
-                          msg=f'简历详情 {done}/{tot}（成功 {ok} / 失败 {fail}），'
-                              f'当前详情覆盖 {min(n_rows, base + done)}/{n_rows}')
+            _set_progress(cat, detail_done=done, detail_total=tot,
+                          msg=f'{label}详情 {done}/{tot}（成功 {ok} / 失败 {fail}）…')
 
     t0 = time.time()
-    got, stat = RF.fetch_many(jlids, fck, workers=workers, on_progress=onp,
-                              min_interval=rate, max_inflight=2,
-                              waf_stop_after=3, retry_rounds=2, retry_delay=8.0)
+    got, stat = RF.fetch_many(objids, ck, workers=workers, on_progress=onp,
+                              retry_rounds=2, retry_delay=2.0, kind=kind)
     el = max(0.1, time.time() - t0)
-    print(f'[简历详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
-          f'需登录 {stat["need_login"]} 被拦截 {stat["waf_block"]}，'
-          f'{stat["rounds"]} 轮，用时 {int(el)}s（{stat["done"] / el:.2f} 请求/秒）')
+    print(f'[{label}详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
+          f'需登录 {stat["need_login"]}，{stat["rounds"]} 轮，用时 {int(el)}s'
+          f'（{stat["done"] / el:.2f} 个/秒）')
 
-    add = [c for c in DETAIL_COLS if c not in cols]
+    add = [c for c in detail_cols if c not in cols]
     if not add:
         # 列已存在：按 id 回填缺失单元格
         for r in rows:
             rid = r[idx] if idx < len(r) else ''
             s = '' if rid in (None, '') else str(rid).strip()
             det = got.get(s) or {}
-            for c in DETAIL_COLS:
+            for c in detail_cols:
                 if c not in cols:
                     continue
                 ci = cols.index(c)
                 if ci >= len(r):
                     continue
                 if not str(r[ci] or '').strip() and det.get(c):
-                    r[ci] = det[c]
+                    r[ci] = _detail_val(det[c], ocr_fn)
     else:
         for r in rows:
             rid = r[idx] if idx < len(r) else ''
             s = '' if rid in (None, '') else str(rid).strip()
             det = got.get(s) or {}
             for c in add:
-                r.append(det.get(c, ''))
+                r.append(_detail_val(det.get(c), ocr_fn))
         cols.extend(add)
 
     with DATA_LOCK:
@@ -881,160 +896,7 @@ def enrich_resume_details(cat='简历库', workers=None, limit=None, only_missin
                      'total': len(rows), 'detail_at': time.time()}
     save_cache(cat)
 
-    # 统计最终详情覆盖率（以「姓名」为锚点）
-    filled = 0
-    if '姓名' in cols:
-        ci = cols.index('姓名')
-        filled = sum(1 for r in rows if ci < len(r) and str(r[ci] or '').strip())
-    cover = f'，详情覆盖 {filled}/{len(rows)}'
-
-    extra = ''
-    if stat.get('waf_block'):
-        extra = (f'（{stat["waf_block"]} 份被站点安全策略拦截，已自动熔断；'
-                 f'请等十几分钟（期间不要继续请求）后点「只补缺失详情」续抓，'
-                 f'或把「前台请求间隔」调大）')
-    elif stat.get('need_login'):
-        extra = f'（{stat["need_login"]} 份返回登录页，前台 Cookie 可能已失效）'
-    if stat.get('stopped') and not stat.get('waf_block'):
-        extra += '（已提前停止）'
-    if skipped:
-        extra += f'（跳过已有详情 {skipped} 份）'
-    return (f'；简历详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}{cover}'
-            f'，新增 {len(add)} 列')
-
-
-# ----------------------------------------------------------------------
-# 岗位：补抓「前台岗位详情」全量字段（参照简历的做法）
-#
-# 后台列表接口 GetYZJobList / GetJZ_YZJobList 只给列表级字段；
-# 岗位完整内容（职位类别/学历要求/招聘人数/工作经验/公司地址/更新时间/
-# 剩余有效期/信息关注度/职位描述/公司介绍/公司行业/规模/性质 …）
-# 来自前台岗位详情页 http://www.hbtc.ccoo.cn/post/zhaopin/{id}x.html
-# ----------------------------------------------------------------------
-def enrich_job_details(cat='全职岗位', workers=None, limit=None, only_missing=False):
-    """给岗位类目（全职岗位/兼职岗位）补抓前台岗位详情，结果作为新列追加到每行末尾。
-
-    only_missing=True 时**跳过已经有详情的行**，只补那些还空着的
-    （用于被 WAF 熔断中断后，稍后续抓剩下的部分，不必重跑全部）。
-
-    返回一段用于展示的说明文本。
-    """
-    with DATA_LOCK:
-        d = DATA.get(cat)
-        if not d or not d.get('rows'):
-            return ''
-        cols = list(d['cols'])
-        rows = d['rows']
-        fetched_at = d.get('fetched_at') or time.time()
-
-    if 'id' not in cols:
-        return '（该类目无 id 字段，跳过岗位详情）'
-
-    fck = CONFIG.get('front_cookie') or ''
-    if not RF.normalize_cookie(fck):
-        return '（未配置前台 Cookie，已跳过岗位详情；配置后可获取完整岗位内容）'
-
-    idx = cols.index('id')
-    # 判断"是否已有详情"的锚点列：岗位标题（前台详情 100% 有值）
-    anchor = '岗位标题'
-    has_anchor = anchor in cols
-    name_idx = cols.index(anchor) if has_anchor else None
-
-    # 起始覆盖率：以「岗位标题」为锚点，统计已带详情的行数（含未去重前）
-    already = 0
-    if name_idx is not None:
-        already = sum(1 for r in rows
-                      if name_idx < len(r) and str(r[name_idx] or '').strip())
-
-    jobids, seen, skipped = [], set(), 0
-    for r in rows:
-        rid = r[idx] if idx < len(r) else ''
-        s = '' if rid in (None, '') else str(rid).strip()
-        if not s or s in seen:
-            continue
-        seen.add(s)
-        if only_missing and name_idx is not None:
-            has = name_idx < len(r) and str(r[name_idx] or '').strip()
-            if has:
-                skipped += 1
-                continue
-        jobids.append(s)
-
-    if limit is None:
-        try:
-            limit = int(CONFIG.get('resume_detail_limit') or 0)
-        except (TypeError, ValueError):
-            limit = 0
-    if limit and limit > 0:
-        jobids = jobids[:limit]
-
-    if not jobids:
-        if only_missing and skipped:
-            return f'（全部 {skipped} 个岗位都已有详情，无需补抓）'
-        return ''
-
-    workers = workers or max(1, min(8, int(CONFIG.get('fetch_workers') or 4)))
-    try:
-        rate = float(CONFIG.get('front_rate') or 3.0)
-    except (TypeError, ValueError):
-        rate = 1.0
-    total = len(jobids)
-    n_rows = len(rows)
-    base = already if only_missing else 0
-    est = total * max(rate, 0.05)
-    print(f'[岗位详情] 开始抓取 {total} 个（跳过已有 {skipped} 个；'
-          f'{workers} 线程，间隔 {rate}s ≈ {1.0 / max(rate, 0.01):.1f} 请求/秒，'
-          f'预计 {int(est // 60)} 分 {int(est % 60)} 秒）…')
-    _set_progress(cat, msg=f'正在抓取 {total} 个岗位详情（前台页）…'
-                           f'当前详情覆盖 {base}/{n_rows}',
-                  detail_done=base, detail_total=n_rows)
-
-    def onp(done, tot, ok, fail):
-        if done % 10 == 0 or done == tot:
-            _set_progress(cat, detail_done=min(n_rows, base + done),
-                          detail_total=n_rows,
-                          msg=f'岗位详情 {done}/{tot}（成功 {ok} / 失败 {fail}），'
-                              f'当前详情覆盖 {min(n_rows, base + done)}/{n_rows}')
-
-    t0 = time.time()
-    got, stat = RF.fetch_many_job(jobids, fck, workers=workers, on_progress=onp,
-                                  min_interval=rate, max_inflight=1,
-                                  waf_stop_after=3, retry_rounds=2, retry_delay=8.0)
-    el = max(0.1, time.time() - t0)
-    print(f'[岗位详情] 完成 成功 {stat["ok"]} 失败 {stat["fail"]} '
-          f'需登录 {stat["need_login"]} 被拦截 {stat["waf_block"]}，'
-          f'{stat["rounds"]} 轮，用时 {int(el)}s（{stat["done"] / el:.2f} 请求/秒）')
-
-    add = [c for c in JOB_DETAIL_COLS if c not in cols]
-    if not add:
-        # 列已存在：按 id 回填缺失单元格
-        for r in rows:
-            rid = r[idx] if idx < len(r) else ''
-            s = '' if rid in (None, '') else str(rid).strip()
-            det = got.get(s) or {}
-            for c in JOB_DETAIL_COLS:
-                if c not in cols:
-                    continue
-                ci = cols.index(c)
-                if ci >= len(r):
-                    continue
-                if not str(r[ci] or '').strip() and det.get(c):
-                    r[ci] = det[c]
-    else:
-        for r in rows:
-            rid = r[idx] if idx < len(r) else ''
-            s = '' if rid in (None, '') else str(rid).strip()
-            det = got.get(s) or {}
-            for c in add:
-                r.append(det.get(c, ''))
-        cols.extend(add)
-
-    with DATA_LOCK:
-        DATA[cat] = {'rows': rows, 'cols': cols, 'fetched_at': fetched_at,
-                     'total': len(rows), 'detail_at': time.time()}
-    save_cache(cat)
-
-    # 统计最终详情覆盖率（以「岗位标题」为锚点）
+    # 统计最终详情覆盖率（以锚点列为准）
     filled = 0
     if anchor in cols:
         ci = cols.index(anchor)
@@ -1042,23 +904,43 @@ def enrich_job_details(cat='全职岗位', workers=None, limit=None, only_missin
     cover = f'，详情覆盖 {filled}/{len(rows)}'
 
     extra = ''
-    if stat.get('waf_block'):
-        extra = (f'（{stat["waf_block"]} 个被站点安全策略拦截，已自动熔断；'
-                 f'请等十几分钟（期间不要继续请求）后点「只补缺失岗位详情」续抓，'
-                 f'或把「前台请求间隔」调大）')
-    elif stat.get('need_login'):
-        extra = f'（{stat["need_login"]} 个返回登录页，前台 Cookie 可能已失效）'
-    if stat.get('stopped') and not stat.get('waf_block'):
+    if stat.get('need_login'):
+        extra = f'（{stat["need_login"]} 个返回登录页，相关 Cookie 可能已失效）'
+    if stat.get('stopped') and not stat.get('need_login'):
         extra += '（已提前停止）'
     if skipped:
         extra += f'（跳过已有详情 {skipped} 个）'
-    return (f'；岗位详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}{cover}'
+    return (f'；{label}详情 成功 {stat["ok"]} / 失败 {stat["fail"]}{extra}{cover}'
             f'，新增 {len(add)} 列')
 
 
+def enrich_resume_details(cat='简历库', only_missing=False):
+    """给简历库补抓后台 /Post/JlEdit 全量字段（v2.0，无需前台 Cookie）"""
+    return _enrich_category(cat, 'resume', DETAIL_COLS, DETAIL_ANCHOR[cat],
+                            CONFIG.get('cookie') or '', '简历', only_missing)
+
+
+def enrich_job_details(cat='全职岗位', only_missing=False):
+    """给岗位类目（全职岗位/兼职岗位）补抓后台 /Post/JobEdit 全量字段"""
+    return _enrich_category(cat, 'job', JOB_DETAIL_COLS, DETAIL_ANCHOR[cat],
+                            CONFIG.get('cookie') or '', '岗位', only_missing)
+
+
+def enrich_company_details(cat='企业库', only_missing=False):
+    """给企业类目（企业库/会员企业）补抓后台 /Enterprise/CompanyAdd 全量字段"""
+    return _enrich_category(cat, 'company', COMPANY_DETAIL_COLS, DETAIL_ANCHOR[cat],
+                            CONFIG.get('cookie') or '', '企业', only_missing)
+
+
+def enrich_user_details(cat='注册用户', only_missing=False):
+    """给注册用户补抓总后台 /yunying/users/user_set.asp 全量字段（需总后台 Cookie，纯文本无需 OCR）"""
+    return _enrich_category(cat, 'user', USER_DETAIL_COLS, DETAIL_ANCHOR[cat],
+                            CONFIG.get('master_cookie') or '', '用户', only_missing)
+
+
 def detail_coverage(cat='简历库'):
-    """返回 (已有详情数, 总行数)，用于界面提示。简历锚点=姓名；岗位锚点=岗位标题"""
-    anchor = '岗位标题' if cat in ('全职岗位', '兼职岗位') else '姓名'
+    """返回 (已有详情数, 总行数)，用于界面提示。锚点列见 DETAIL_ANCHOR。"""
+    anchor = DETAIL_ANCHOR.get(cat, '姓名')
     with DATA_LOCK:
         d = DATA.get(cat)
         if not d or not d.get('rows'):
@@ -1107,6 +989,10 @@ def export_excel(cat, rows, cols, path):
         hidden |= RESUME_DETAIL_HIDDEN
     elif cat in ('全职岗位', '兼职岗位'):
         hidden |= JOB_DETAIL_HIDDEN
+    elif cat in ('企业库', '会员企业'):
+        hidden |= COMPANY_DETAIL_HIDDEN
+    elif cat == '注册用户':
+        hidden |= USER_DETAIL_HIDDEN
     zh_map = ZH_LABELS.get(cat, {})
     wb = Workbook(write_only=True)
     ws = wb.create_sheet(cat)
@@ -1247,12 +1133,9 @@ def index():
 
 
 @app.route('/api/config', methods=['GET'])
-@app.route('/api/config', methods=['GET'])
 def api_config_get():
-    global CONFIG
-    with CONFIG_LOCK:
-        CONFIG = load_config()
-    return jsonify(dict(CONFIG))
+    cfg = dict(CONFIG)
+    return jsonify(cfg)
 
 
 @app.route('/api/config', methods=['POST'])
@@ -1260,7 +1143,7 @@ def api_config_set():
     global CONFIG
     d = request.get_json(force=True, silent=True) or {}
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'front_cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'master_cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
         if 'ocr_scale' in d:
@@ -1270,12 +1153,7 @@ def api_config_set():
                 pass
         if 'fetch_workers' in d:
             try:
-                CONFIG['fetch_workers'] = max(1, min(8, int(d['fetch_workers'])))
-            except (TypeError, ValueError):
-                pass
-        if 'front_rate' in d:
-            try:
-                CONFIG['front_rate'] = min(5.0, max(0.0, float(d['front_rate'])))
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
             except (TypeError, ValueError):
                 pass
         if 'fetch_resume_detail' in d:
@@ -1290,19 +1168,19 @@ def api_config_set():
     return jsonify({'ok': True})
 
 
-@app.route('/api/front_test', methods=['POST'])
-def api_front_test():
-    """测试「前台 Cookie」是否可用于抓取简历详情页"""
+@app.route('/api/master_test', methods=['POST'])
+def api_master_test():
+    """测试「总后台 Cookie」（www.admin.ccoo.cn）是否可用于抓取用户全量字段"""
     global CONFIG
     d = request.get_json(force=True, silent=True) or {}
-    ck = d.get('front_cookie')
+    ck = d.get('master_cookie')
     if ck is None:
-        ck = CONFIG.get('front_cookie', '')
+        ck = CONFIG.get('master_cookie', '')
     ck = str(ck)
-    ok, msg, sample = RF.test_front_cookie(ck)
+    ok, msg, sample = RF.test_master_cookie(ck)
     if ok and ck:
         with CONFIG_LOCK:
-            CONFIG['front_cookie'] = ck
+            CONFIG['master_cookie'] = ck
             save_config(CONFIG)
             CONFIG = load_config()
     return jsonify({'ok': ok, 'msg': msg, 'sample': sample})
@@ -1310,7 +1188,7 @@ def api_front_test():
 
 @app.route('/api/enrich_resume', methods=['POST'])
 def api_enrich_resume():
-    """对已抓取的简历库单独补抓前台简历详情（不重新拉列表）
+    """对已抓取的简历库单独补抓后台 /Post/JlEdit 全量字段（不重新拉列表）
 
     body 可选：{"only_missing": true} —— 只补还没有详情的那些（断点续抓）
     """
@@ -1340,7 +1218,7 @@ def api_enrich_resume():
 
 @app.route('/api/enrich_job', methods=['POST'])
 def api_enrich_job():
-    """对已抓取的岗位类目（全职岗位/兼职岗位）单独补抓前台岗位详情（不重新拉列表）
+    """对已抓取的岗位类目（全职岗位/兼职岗位）单独补抓后台 /Post/JobEdit 全量字段
 
     body 可选：{"cat": "全职岗位", "only_missing": true} —— only_missing 只补没有详情的（断点续抓）
     """
@@ -1371,6 +1249,70 @@ def api_enrich_job():
     return jsonify({'ok': True, 'msg': '已开始补抓岗位详情'})
 
 
+@app.route('/api/enrich_company', methods=['POST'])
+def api_enrich_company():
+    """对已抓取的企业类目（企业库/会员企业）单独补抓后台 /Enterprise/CompanyAdd 全量字段
+
+    body 可选：{"cat": "企业库", "only_missing": true} —— only_missing 只补没有详情的（断点续抓）
+    """
+    d = request.get_json(force=True, silent=True) or {}
+    cat = str(d.get('cat') or '企业库')
+    only_missing = bool(d.get('only_missing'))
+    if cat not in ('企业库', '会员企业'):
+        return jsonify({'ok': False, 'msg': '仅支持企业库/会员企业类目'})
+    with JOB_LOCK:
+        if cat in FETCH_JOBS:
+            return jsonify({'ok': False, 'msg': f'{cat} 正在抓取中'})
+        FETCH_JOBS.add(cat)
+
+    def runner():
+        try:
+            info = enrich_company_details(cat, only_missing=only_missing)
+            filled, tot = detail_coverage(cat)
+            _set_progress(cat, phase='done',
+                          msg=f'企业详情补抓完成{info}（详情覆盖 {filled}/{tot}）')
+        except Exception as e:
+            traceback.print_exc()
+            _set_progress(cat, phase='error', msg=f'企业详情抓取失败：{e}')
+        finally:
+            with JOB_LOCK:
+                FETCH_JOBS.discard(cat)
+
+    threading.Thread(target=runner, daemon=True).start()
+    return jsonify({'ok': True, 'msg': '已开始补抓企业详情'})
+
+
+@app.route('/api/enrich_user', methods=['POST'])
+def api_enrich_user():
+    """对已抓取的注册用户单独补抓总后台 /yunying/users/user_set.asp 全量字段
+
+    body 可选：{"only_missing": true} —— only_missing 只补没有详情的（断点续抓）
+    需要已配置「总后台 Cookie」。
+    """
+    d = request.get_json(force=True, silent=True) or {}
+    only_missing = bool(d.get('only_missing'))
+    with JOB_LOCK:
+        if '注册用户' in FETCH_JOBS:
+            return jsonify({'ok': False, 'msg': '注册用户正在抓取中'})
+        FETCH_JOBS.add('注册用户')
+
+    def runner():
+        try:
+            info = enrich_user_details('注册用户', only_missing=only_missing)
+            filled, tot = detail_coverage('注册用户')
+            _set_progress('注册用户', phase='done',
+                          msg=f'用户详情补抓完成{info}（详情覆盖 {filled}/{tot}）')
+        except Exception as e:
+            traceback.print_exc()
+            _set_progress('注册用户', phase='error', msg=f'用户详情抓取失败：{e}')
+        finally:
+            with JOB_LOCK:
+                FETCH_JOBS.discard('注册用户')
+
+    threading.Thread(target=runner, daemon=True).start()
+    return jsonify({'ok': True, 'msg': '已开始补抓用户详情'})
+
+
 @app.route('/api/config/export', methods=['GET'])
 def api_config_export():
     data = json.dumps(CONFIG, ensure_ascii=False, indent=2)
@@ -1386,12 +1328,17 @@ def api_config_import():
     if not isinstance(d, dict):
         return jsonify({'ok': False, 'msg': '不是有效的 JSON 配置文件'})
     with CONFIG_LOCK:
-        for k in ('username', 'password', 'cookie', 'save_dir'):
+        for k in ('username', 'password', 'cookie', 'master_cookie', 'save_dir'):
             if k in d:
                 CONFIG[k] = str(d[k] or '')
         if 'ocr_scale' in d:
             try:
                 CONFIG['ocr_scale'] = max(1, min(20, int(d['ocr_scale'])))
+            except (TypeError, ValueError):
+                pass
+        if 'fetch_workers' in d:
+            try:
+                CONFIG['fetch_workers'] = max(1, min(16, int(d['fetch_workers'])))
             except (TypeError, ValueError):
                 pass
         save_config(CONFIG)

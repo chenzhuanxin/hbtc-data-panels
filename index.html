@@ -141,39 +141,31 @@
     <div class="hero-meta">
       <span class="chip">Windows 单文件 exe</span>
       <span class="chip">本地运行 · 数据不上传</span>
-      <span class="chip">简历全量字段</span>
+      <span class="chip">后台全量字段</span>
       <span class="chip">Excel / ZIP 导出</span>
       <span class="chip">离线 OCR</span>
-      <span class="chip">反爬限速</span>
+      <span class="chip">全并发提速</span>
     </div>
   </div>
 </div>
 
 <section>
   <div class="wrap">
-    <h2 class="sec-title">v1.3.0：简历「全量」问题已修复</h2>
-    <p class="sec-sub">如果你之前导出的简历表后半段是空的，看这里。</p>
-    <div class="step" style="border-left:4px solid #d9534f;background:#fff8f7">
-      <h4 style="color:#b33b34">问题：8 线程快抓 200 份，只成功了 120 份</h4>
-      <p style="color:#7d3b36">
-        前台简历详情页前方是 nginx WAF，拦的是<strong>累计请求量</strong>而不是并发数。
-        用 8 线程、不限间隔连抓 200 份时，<strong>只有 120 份成功、80 份失败</strong>，
-        且失败的全部集中在后半段——导出的表里后 80 行整片空白，看起来就像「只拿到了后台的部分数据」。
-      </p>
-    </div>
-    <div class="step" style="border-left:4px solid #2f8f5b;background:#f6fbf8;margin-top:14px">
-      <h4 style="color:#236b45">修复：限速 + 自动补抓 + 覆盖率反馈</h4>
+    <h2 class="sec-title">v2.0：详情抓取全面切换后台编辑页</h2>
+    <p class="sec-sub">不再抓前台网站、不再需要前台 Cookie；简历/岗位/企业/用户全量字段都从后台编辑页取。</p>
+    <div class="step" style="border-left:4px solid #2f8f5b;background:#f6fbf8">
+      <h4 style="color:#236b45">四项变化</h4>
       <p style="color:#2c5541">
-        改用 <strong>1 请求/秒</strong>限速重抓，那 80 份<strong>全部成功</strong>；200 份全量只用 <strong>256 秒</strong>，
-        <strong>200/200 全部拿到</strong>。v1.3.0 内置：失败<strong>自动再补 2 轮</strong>、
-        连拦 3 次<strong>自动熔断</strong>、中断后点「<strong>只补缺失详情</strong>」续抓，
-        并在界面实时显示「<strong>当前详情覆盖 120/200</strong>」——<strong>覆盖数 = 总行数</strong>才算全量。
+        ① <strong>不需要前台 Cookie</strong>——简历正文改从后台编辑页 <code>/Post/JlEdit</code> 拿（字段比前台更全）；
+        ② <strong>新增总后台 Cookie</strong>——仅「注册用户」全量字段需要（<code>user_set.asp</code>，纯文本无需 OCR），可留空；
+        ③ <strong>速度大幅提升</strong>——后台编辑页无前台 nginx WAF，去掉令牌桶限速/请求间隔，全并发抓取；
+        ④ <strong>OCR 仍保留</strong>——列表里的电话图片照常离线识别。
       </p>
     </div>
     <div class="note" style="margin-top:14px">
       <strong>字段空缺 ≠ 抓取失败。</strong>200 份全量成功后的真实填充率：姓名/性别/年龄/自我描述详情
       <strong>100%</strong>、学历 99%、工作经历 1 <strong>55%</strong>、头像 53%、现居地 45%、
-      教育经历 1 37%、获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，前台页面本身就没有那个区块。
+      教育经历 1 37%、获得证书 1 15%、语言能力 1 13%。求职者没填哪一项，后台表单里本身就没有那个区块。
     </div>
   </div>
 </section>
@@ -195,19 +187,19 @@
           </div>
         </div>
         <div class="card-body">
-          <p>一键抓取招聘后台 <strong>7 个类目</strong>的全量数据，自动识别电话图片并转文字，简历库还能补抓<strong>完整简历字段</strong>，按参考格式导出 Excel。</p>
+          <p>一键抓取招聘后台 <strong>7 个类目</strong>的全量数据，自动识别电话图片并转文字，简历/岗位/企业/用户详情从后台编辑页补抓<strong>全量字段</strong>，按参考格式导出 Excel。</p>
           <ul class="feat">
             <li>7 类目全覆盖：订单管理 / 全职岗位 / 兼职岗位 / 企业库 / 会员企业 / 简历库 / 注册用户</li>
             <li>base64 图片电话自动 OCR（RapidOCR 离线识别，无需联网）</li>
-            <li><b>简历全量字段补抓</b>：前台简历页逐份解析，工作/教育经历、语言能力、获得证书入表（91 → 116 列）</li>
+            <li><b>详情全量字段补抓</b>：简历 JlEdit / 岗位 JobEdit / 企业 CompanyAdd / 用户 user_set.asp（后台编辑页，无需前台 Cookie）</li>
             <li>类目勾选导出：单类目 = 一个 xlsx，多类目 = 自动打 zip 包</li>
             <li>保留全部字段，次要列自动隐藏；非法字符自动清洗</li>
-            <li>并发分页抓取，7 类目共 9.8 万条也能快速拉完</li>
+            <li>后台无 WAF，全并发分页抓取，7 类目共 9.8 万条快速拉完</li>
           </ul>
         </div>
         <div class="card-foot">
           <a class="btn primary" href="city-data-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.3.0/CityDataPanel-v1.3.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v2.0.0/CityDataPanel-v2.0.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -225,14 +217,15 @@
           <ul class="feat">
             <li>企业名称模糊搜索，选企业后可单独查该企业的岗位列表</li>
             <li>岗位投递明细：投递人、时间、联系方式（明文电话/邮箱/QQ）</li>
-            <li><b>简历全量解析</b>：前台简历页逐份抓取，基本信息、期望职位薪资、自我描述、工作/教育经历、语言与证书</li>
+            <li><b>简历全量解析</b>：后台编辑页逐份抓取，基本信息、期望职位薪资、自我描述、工作/教育经历、语言与证书</li>
+            <li>岗位列表扩 15 列（岗位全量字段）+「企业信息」sheet 24 列（企业全量字段）</li>
             <li>导出可勾选：仅岗位列表 / 仅投递简历 / 两者都要</li>
-            <li>并发抓取 8 线程，数百份简历详情 1 分钟内抓完</li>
+            <li>后台无 WAF，全并发抓取，数百份简历详情 1 分钟内抓完</li>
           </ul>
         </div>
         <div class="card-foot">
           <a class="btn teal" href="resume-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.3.0/ResumeCollector-v1.3.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v2.0.0/ResumeCollector-v2.0.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -246,18 +239,18 @@
           </div>
         </div>
         <div class="card-body">
-          <p>把上面两套工具<strong>装进同一个 exe</strong>：一个门户页 + 两个内置子面板，<strong>一份 config.json 共享配置</strong>，后台 / 前台 Cookie 只填一次。</p>
+          <p>把上面两套工具<strong>装进同一个 exe</strong>：一个门户页 + 两个内置子面板，<strong>一份 config.json 共享配置</strong>，后台 / 总后台 Cookie 只填一次。</p>
           <ul class="feat">
             <li>一个 exe · 一个端口：门户 <code>/</code>、平台数据 <code>/city/</code>、企业投递 <code>/jd/</code></li>
-            <li>配置共享：两种 Cookie、保存目录、限速参数在两个子面板间实时同步</li>
+            <li>配置共享：后台 Cookie、总后台 Cookie、保存目录在两个子面板间实时同步</li>
             <li>数据分存：<code>数据_平台面板/</code> 与 <code>数据_简历面板/</code> 互不干扰</li>
-            <li>功能与两个独立面板完全一致（7 类目 + OCR + 简历全量字段 / 企业→岗位→投递→完整简历）</li>
+            <li>功能与两个独立面板完全一致（7 类目 + OCR + 四类全量字段 / 企业→岗位→投递→完整简历）</li>
             <li>不想开两个 exe、不想重复填 Cookie 时用它最省事</li>
           </ul>
         </div>
         <div class="card-foot">
           <a class="btn violet" href="combined-panel/index.html">查看详细说明 →</a>
-          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v1.3.0/CombinedPanel-v1.3.0-windows-x64.exe">下载 exe</a>
+          <a class="btn" href="https://github.com/chenzhuanxin/hbtc-data-panels/releases/download/v2.0.0/CombinedPanel-v2.0.0-windows-x64.exe">下载 exe</a>
         </div>
       </div>
 
@@ -280,7 +273,7 @@
           <tr><td>兼职岗位</td><td class="num">23</td><td>兼职招聘岗位</td></tr>
           <tr><td>企业库</td><td class="num">4,735</td><td>平台企业主体名录</td></tr>
           <tr><td>会员企业</td><td class="num">198</td><td>付费会员企业</td></tr>
-          <tr><td>简历库</td><td class="num">15,733</td><td>求职简历，电话字段为图片；补抓详情后 91 → <b>116 列</b></td></tr>
+          <tr><td>简历库</td><td class="num">15,733</td><td>求职简历，电话字段为图片；详情从后台编辑页 JlEdit 补抓（工作/教育经历等全量字段）</td></tr>
           <tr><td>注册用户</td><td class="num">73,046</td><td>站点注册用户，手机号字段为图片</td></tr>
           <tr><td style="font-weight:700">合计</td><td class="num">98,657</td><td>—</td></tr>
         </tbody>
@@ -306,8 +299,8 @@
       </div>
       <div class="step">
         <div class="n">3</div>
-        <h4>填账号 / 两种 Cookie</h4>
-        <p>填入后台账号密码或后台 Cookie（管类目与投递列表）。若要<b>完整简历内容</b>，再粘贴前台站点 <code>www.hbtc.ccoo.cn</code> 的 Cookie，各自点「测试」验证。</p>
+        <h4>填账号 / Cookie</h4>
+        <p>填入后台账号密码或后台 Cookie（管类目、投递列表与简历/岗位/企业详情）。若要<b>注册用户全量字段</b>，再粘贴总后台 <code>www.admin.ccoo.cn</code> 的 Cookie（可留空），点「测试」验证。</p>
       </div>
       <div class="step">
         <div class="n">4</div>
@@ -316,8 +309,8 @@
       </div>
     </div>
     <div class="note" style="background:#fff8e9;border:1px solid #f6e0b0;border-left:4px solid #F5A623;border-radius:12px;padding:16px 20px;font-size:14px;color:#6b5320;margin-top:30px">
-      <b>为什么需要前台 Cookie？</b>简历的完整正文（工作经历、教育经历、语言能力、获得证书）只存在于前台简历详情页
-      <code>/post/qiuzhi/{id}x.html</code>，该页不带前台登录 Cookie 会返回登录页。两种 Cookie 分开配置、各管一段。
+      <b>v2.0 不需要前台 Cookie：</b>简历/岗位/企业详情改从后台编辑页（JlEdit / JobEdit / CompanyAdd）抓取，
+      用户全量字段从总后台 user_set.asp 抓取（需总后台 Cookie，纯文本无需 OCR）。后台无 WAF，全并发提速。
     </div>
   </div>
 </section>

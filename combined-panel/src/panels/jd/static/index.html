@@ -208,24 +208,9 @@ td.link{color:var(--pri);cursor:pointer;text-decoration:underline}
     <label class="f" style="width:100%;margin-top:12px">Cookie（分号分隔，从浏览器登录后台后复制）</label>
     <textarea id="cookie" placeholder="ccoocitycrm=...; ASP.NET_SessionId=...; siteid="></textarea>
 
-    <label class="f" style="width:100%;margin-top:14px">
-      前台 Cookie
-      <b style="color:#e0552b">（抓取完整简历内容必需）</b>
-    </label>
-    <textarea id="frontCookie" placeholder="登录 www.hbtc.ccoo.cn 后复制：PHPSESSID=...; ccoo=logintime=...&amp;uid=...; siteid=880; sitename=..."></textarea>
-    <div class="row" style="margin-top:8px;gap:10px;align-items:center">
-      <button class="ghost" onclick="App.testFrontCookie()">测试前台 Cookie</button>
-      <span id="frontMsg" class="msg"></span>
-      <span class="muted">
-        完整简历内容（工作经历 1-10 / 教育经历 / 语言能力 / 获得证书 / 职位类别 / 现居地）
-        只能从前台简历页 <code>/post/qiuzhi/{jlid}x.html</code> 取得，该页需要前台登录 Cookie。
-        不填则简历详情退化为后台页的部分字段。
-      </span>
-    </div>
     <div class="row mt" style="gap:14px">
-      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
-      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="1" title="任意两次前台简历请求之间的最小间隔（秒）。1 ≈ 1 请求/秒，与站点可承受速率一致；调小会更快但可能被站点安全策略拦截"></label>
-      <span class="muted">站点有反爬：间隔越大越安全，调大线程不会更快</span>
+      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="8" title="列表/后台编辑页并发线程，默认 8。后台页面无前台反爬，可放心调大提速"></label>
+      <span class="muted">简历/岗位/企业全量字段均从后台编辑页抓取，无需前台 Cookie；后台无 WAF 限速，全并发提速</span>
     </div>
     <div class="row mt">
       <button onclick="App.saveConfig()">保存配置</button>
@@ -344,7 +329,7 @@ td.link{color:var(--pri);cursor:pointer;text-decoration:underline}
       勾选要导出的内容，可<b>单独导出「岗位列表」</b>，也可两个一起导出（一个 Excel 含两个工作表）。
       <b>「投递简历」</b>=每条投递一行（含简历内容与简历链接）；<b>「岗位列表」</b>=该企业全部岗位（岗位名称 / 链接 / 投递简历数 / 发布时间）。
       文件名自动生成，无需手动输入；次要字段（头像/照片/工作经历7+ /教育经历3+ /语言能力2+ /证书3+）默认隐藏但保留，可在 Excel 中取消隐藏查看。
-      <b>简历内容取自前台简历详情页</b>（需在①中配置前台 Cookie），工作经历最多 10 段、教育经历 5 段、语言能力 5 项、获得证书 5 项。
+      <b>简历内容取自后台编辑页 /Post/JlEdit</b>（需在①中配置后台 Cookie），工作经历最多 10 段、教育经历 5 段、语言能力 5 项、获得证书 5 项；导出含「企业信息」sheet（企业全量字段）与「岗位列表」sheet（岗位全量字段）。
     </p>
   </section>
 
@@ -386,12 +371,9 @@ const App = (() => {
     $('#username').value = c.username || '';
     $('#password').value = c.password || '';
     $('#cookie').value = c.cookie || '';
-    $('#frontCookie').value = c.front_cookie || '';
     $('#saveDir').value = c.save_dir || '';
-    $('#fetchWorkers').value = c.fetch_workers || 4;
-    $('#frontRate').value = (c.front_rate === undefined || c.front_rate === null) ? 1 : c.front_rate;
+    $('#fetchWorkers').value = c.fetch_workers || 8;
     if (c.cookie) msg($('#connMsg'), '已载入已保存的 Cookie', 'ok');
-    if (!c.front_cookie) msg($('#frontMsg'), '未配置前台 Cookie，简历详情将不完整', 'warn');
     $('#importFile').addEventListener('change', importConfig);
     await refreshState();
     setStep(1);
@@ -399,17 +381,11 @@ const App = (() => {
   async function saveConfig(){
     await jpost('/jd/api/config', {
       username: $('#username').value, password: $('#password').value,
-      cookie: $('#cookie').value, front_cookie: $('#frontCookie').value,
+      cookie: $('#cookie').value,
       save_dir: $('#saveDir').value,
-      fetch_workers: parseInt($('#fetchWorkers').value) || 4,
-      front_rate: parseFloat($('#frontRate').value) || 1
+      fetch_workers: parseInt($('#fetchWorkers').value) || 8
     });
     msg($('#connMsg'), '✔ 配置已保存到 config.json', 'ok');
-  }
-  async function testFrontCookie(){
-    msg($('#frontMsg'), '正在测试前台 Cookie…', 'warn');
-    const r = await jpost('/jd/api/front_test', { front_cookie: $('#frontCookie').value });
-    msg($('#frontMsg'), (r.ok ? '✔ ' : '✘ ') + r.msg, r.ok ? 'ok' : 'err');
   }
   async function testCookie(){
     msg($('#connMsg'), '正在测试…', 'warn');
@@ -724,7 +700,7 @@ const App = (() => {
   }
   async function openPath(p){ await jpost('/jd/api/open_path', { path: p }); }
 
-  const api = { init, saveConfig, testCookie, testFrontCookie, exportConfig, refreshCaptcha, doLogin,
+  const api = { init, saveConfig, testCookie, exportConfig, refreshCaptcha, doLogin,
     searchCompany, toggleAllJobs, selectJobSet, startFetch, clearAll,
     loadData, page, pickDir, doExport, sheetPreset, openPath, pollProgress, pollExport };
   return api;
@@ -732,13 +708,5 @@ const App = (() => {
 window.App = App;
 document.addEventListener('DOMContentLoaded', App.init);
 </script>
-
-<div style="position:fixed;left:14px;bottom:14px;z-index:9999">
-  <a href="/" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;
-     padding:8px 14px;border-radius:999px;background:#1b2a4a;color:#dbe6fa;
-     text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:.92"
-     onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.92">
-    &#8592; 综合面板首页</a>
-</div>
 </body>
 </html>

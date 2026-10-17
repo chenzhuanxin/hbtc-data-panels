@@ -95,17 +95,17 @@ tbody tr:nth-child(even){background:#fafbfe}
     <textarea id="cookie" placeholder="ccoocitycrm=...; ASP.NET_SessionId=...; siteid="></textarea>
 
     <label class="f" style="width:100%;margin-top:12px">
-      前台 Cookie
-      <b style="color:#e0552b">（抓取简历库完整内容必需）</b>
+      总后台 Cookie
+      <b style="color:#e0552b">（注册用户全量字段必需，www.admin.ccoo.cn）</b>
     </label>
-    <textarea id="frontCookie" placeholder="登录 www.hbtc.ccoo.cn 后复制：PHPSESSID=...; ccoo=logintime=...&amp;uid=...; siteid=880; sitename=..."></textarea>
+    <textarea id="masterCookie" placeholder="登录 www.admin.ccoo.cn 后复制：__guid=...; ASPSESSIONID...=..."></textarea>
     <div class="row" style="margin-top:8px;gap:10px;align-items:center">
-      <button class="ghost" onclick="App.testFrontCookie()">测试前台 Cookie</button>
-      <span id="frontMsg" class="msg"></span>
+      <button class="ghost" onclick="App.testMasterCookie()">测试总后台 Cookie</button>
+      <span id="masterMsg" class="msg"></span>
       <span class="muted">
-        简历库的完整内容（工作经历 1-10 / 教育经历 / 语言能力 / 获得证书 / 职位类别 / 现居地）
-        来自前台简历页 <code>/post/qiuzhi/{id}x.html</code>，需要前台登录 Cookie。
-        不填则简历库只有列表字段。
+        用户全量字段（用户名/昵称/注册IP/账号状态/论坛信息/会员服务等）来自总后台
+        <code>/yunying/users/user_set.asp</code>，需要总后台 Cookie；页面为纯文本，无需 OCR。
+        不填则注册用户只有列表字段。
       </span>
     </div>
     <div class="row" style="margin-top:10px">
@@ -114,8 +114,7 @@ tbody tr:nth-child(even){background:#fafbfe}
       <button class="ghost" onclick="App.exportConfig()">导出配置(JSON)</button>
       <label class="f">导入配置(JSON)<input type="file" id="importFile" accept=".json" style="font-size:12px"></label>
       <label class="f">OCR放大倍数<input type="text" id="ocrScale" style="width:60px" value="1" title="RapidOCR 建议 1（实测 1 倍最准）"></label>
-      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="4" title="前台简历页并发线程，建议 4。站点有反爬，调大反而容易被封 IP"></label>
-      <label class="f">前台请求间隔(秒)<input type="text" id="frontRate" style="width:80px" value="3" title="岗位与简历前台详情统一使用的请求间隔（秒）。3 ≈ 0.33 请求/秒，低速更安全；前台站点对高频访问极敏感（IP 频繁访问即 403 拉黑），若被拦请调大到 4-5 并等待十几分钟冷却"></label>
+      <label class="f">抓取线程<input type="text" id="fetchWorkers" style="width:60px" value="8" title="列表/后台详情页并发线程，默认 8。后台页面无前台反爬，可放心调大提速"></label>
       <span id="connMsg" class="msg"></span>
     </div>
   </div>
@@ -126,12 +125,12 @@ tbody tr:nth-child(even){background:#fafbfe}
       <h2 style="margin-bottom:0">② 数据抓取</h2>
       <div class="row">
         <span class="kv">单类目限抓页数(0=全部) <input type="text" id="maxPages" value="0" style="width:60px"></span>
-        <label class="kv" title="抓取类目时是否同步从前台补全全量字段。简历的工作经历/教育经历/语言/证书、岗位的职位描述/公司信息等详情字段都来自前台页面；具体类目下方可单独勾选，此处为全局默认">
-          <input type="checkbox" id="withDetail" checked> 抓取时同步补全前台全量字段（默认）
+        <label class="kv" title="抓取类目时是否同步从后台/总后台编辑页补全全量字段。简历（JlEdit）、岗位（JobEdit）、企业（CompanyAdd）、用户（user_set.asp）详情都在抓完列表后自动补；具体类目下方可单独勾选，此处为全局默认">
+          <input type="checkbox" id="withDetail" checked> 抓取时同步补全后台全量字段（默认）
         </label>
         <span class="kv">详情限抓条数(0=全部) <input type="text" id="detailLimit" value="0" style="width:70px"></span>
         <button class="ghost" onclick="App.fetchAll()">一键抓取全部类目</button>
-        <span class="kv" style="color:#c62828;font-weight:bold">↓ 简历库、全职岗位、兼职岗位下方各有「补抓详情」勾选与按钮</span>
+        <span class="kv" style="color:#c62828;font-weight:bold">↓ 简历库 / 全职岗位 / 兼职岗位 / 企业库 / 会员企业 / 注册用户 下方各有「补抓详情」按钮</span>
       </div>
     </div>
     <div class="cats" id="cats" style="margin-top:12px"></div>
@@ -197,13 +196,12 @@ const App=(()=>{
     const cfg=await jget('/city/api/config');
     $('#username').value=cfg.username||''; $('#password').value=cfg.password||'';
     $('#cookie').value=cfg.cookie||''; $('#saveDir').value=cfg.save_dir||'';
-    $('#frontCookie').value=cfg.front_cookie||'';
+    $('#masterCookie').value=cfg.master_cookie||'';
     $('#ocrScale').value=cfg.ocr_scale||1;
-    $('#fetchWorkers').value=cfg.fetch_workers||4;
-    $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?3:cfg.front_rate;
+    $('#fetchWorkers').value=cfg.fetch_workers||8;
     if($('#withDetail')) $('#withDetail').checked=(cfg.fetch_resume_detail===undefined?true:!!cfg.fetch_resume_detail);
     if($('#detailLimit')) $('#detailLimit').value=cfg.resume_detail_limit||0;
-    if(!cfg.front_cookie) flash($('#frontMsg'),'未配置前台 Cookie，简历库将没有完整内容','warn');
+    if(!cfg.master_cookie) flash($('#masterMsg'),'未配置总后台 Cookie，注册用户将没有全量字段','warn');
     const c=await jget('/city/api/categories');
     CATS=c.cats; INFO=c.info; HIDDEN=c.hidden; ZH=c.zh; EN=c.en;
     renderCats(c.unavailable); renderTabs(); renderExportCats();
@@ -222,19 +220,35 @@ const App=(()=>{
       if(c==='简历库'){
         extra=`<div class="drow" style="margin-top:6px">
           <label style="font-size:12px"><input type="checkbox" id="withDetail_${c}" checked>
-            抓取时同步补全前台简历全量字段</label>
+            抓取时同步补全后台简历全量字段</label>
           <button class="ghost" style="font-size:12px" onclick="App.enrichResume(false)">补抓简历详情(全量)</button>
           <button class="ghost" style="font-size:12px" onclick="App.enrichResume(true)">只补缺失</button>
         </div>
-        <div class="dtip" style="font-size:11px;color:#888">工作经历/教育经历/语言/证书等全量字段来自前台简历详情页（需前台Cookie，被拦时等冷却后点「只补缺失」续抓）</div>`;
+        <div class="dtip" style="font-size:11px;color:#888">工作经历/教育经历/语言/证书等全量字段来自后台编辑页 /Post/JlEdit（后台 Cookie，全并发抓取）</div>`;
       }else if(c==='全职岗位'||c==='兼职岗位'){
         extra=`<div class="drow" style="margin-top:6px">
           <label style="font-size:12px"><input type="checkbox" id="withDetail_${c}" checked>
-            抓取时同步补全前台岗位全量字段</label>
+            抓取时同步补全后台岗位全量字段</label>
           <button class="ghost" style="font-size:12px" onclick="App.enrichJob('${c}',false)">补抓岗位详情(全量)</button>
           <button class="ghost" style="font-size:12px" onclick="App.enrichJob('${c}',true)">只补缺失</button>
         </div>
-        <div class="dtip" style="font-size:11px;color:#888">职位类别/学历/人数/经验/描述/公司信息等全量字段来自前台岗位详情页（需前台Cookie，被拦时等冷却后点「只补缺失」续抓）</div>`;
+        <div class="dtip" style="font-size:11px;color:#888">职位类别/学历/人数/经验/描述/公司信息等全量字段来自后台编辑页 /Post/JobEdit</div>`;
+      }else if(c==='企业库'||c==='会员企业'){
+        extra=`<div class="drow" style="margin-top:6px">
+          <label style="font-size:12px"><input type="checkbox" id="withDetail_${c}" checked>
+            抓取时同步补全后台企业全量字段</label>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichCompany('${c}',false)">补抓企业详情(全量)</button>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichCompany('${c}',true)">只补缺失</button>
+        </div>
+        <div class="dtip" style="font-size:11px;color:#888">联系人/电话/简介/行业/规模/认证/到期时间等全量字段来自后台编辑页 /Enterprise/CompanyAdd</div>`;
+      }else if(c==='注册用户'){
+        extra=`<div class="drow" style="margin-top:6px">
+          <label style="font-size:12px"><input type="checkbox" id="withDetail_${c}" checked>
+            抓取时同步补全总后台用户全量字段</label>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichUser(false)">补抓用户详情(全量)</button>
+          <button class="ghost" style="font-size:12px" onclick="App.enrichUser(true)">只补缺失</button>
+        </div>
+        <div class="dtip" style="font-size:11px;color:#888">用户名/昵称/注册IP/账号状态/论坛/会员服务等来自总后台 /yunying/users/user_set.asp（需总后台 Cookie，纯文本无需 OCR）</div>`;
       }
       d.innerHTML=`<div class="t"><span>${c}${INFO[c].ocr?'<span class="badge">电话OCR</span>':''}</span>
         <button onclick="App.fetchOne('${c}')">抓取</button></div>
@@ -369,17 +383,17 @@ const App=(()=>{
       await jpost('/city/api/fetch',{cat:c,max_pages:parseInt($('#maxPages').value)||0,use_ocr:true,with_detail:wd});
     }
   }
-  async function testFrontCookie(){
-    flash($('#frontMsg'),'正在测试前台 Cookie…','warn');
-    const r=await jpost('/city/api/front_test',{front_cookie:$('#frontCookie').value});
-    flash($('#frontMsg'),(r.ok?'✔ ':'✘ ')+r.msg,r.ok?'ok':'err');
+  async function testMasterCookie(){
+    flash($('#masterMsg'),'正在测试总后台 Cookie…','warn');
+    const r=await jpost('/city/api/master_test',{master_cookie:$('#masterCookie').value});
+    flash($('#masterMsg'),(r.ok?'✔ ':'✘ ')+r.msg,r.ok?'ok':'err');
   }
   async function enrichResume(onlyMissing){
     await saveConfig();
     const tip = onlyMissing
-      ? '已开始【只补缺失详情】，将跳过已有详情、只抓空缺的那些…'
+      ? '已开始【只补缺失简历详情】，将跳过已有详情、只抓空缺的那些…'
       : '已开始【全量补抓简历详情】，请看抓取进度…';
-    flash($('#frontMsg'),tip,'warn');
+    flash($('#masterMsg'),tip,'warn');
     await jpost('/city/api/enrich_resume',{only_missing:!!onlyMissing});
   }
   async function enrichJob(cat, onlyMissing){
@@ -387,8 +401,24 @@ const App=(()=>{
     const tip = onlyMissing
       ? `已开始【只补缺失岗位详情】(${cat})，将跳过已有详情、只抓空缺的那些…`
       : `已开始【全量补抓岗位详情】(${cat})，请看抓取进度…`;
-    flash($('#frontMsg'),tip,'warn');
+    flash($('#masterMsg'),tip,'warn');
     await jpost('/city/api/enrich_job',{cat,only_missing:!!onlyMissing});
+  }
+  async function enrichCompany(cat, onlyMissing){
+    await saveConfig();
+    const tip = onlyMissing
+      ? `已开始【只补缺失企业详情】(${cat})，将跳过已有详情、只抓空缺的那些…`
+      : `已开始【全量补抓企业详情】(${cat})，请看抓取进度…`;
+    flash($('#masterMsg'),tip,'warn');
+    await jpost('/city/api/enrich_company',{cat,only_missing:!!onlyMissing});
+  }
+  async function enrichUser(onlyMissing){
+    await saveConfig();
+    const tip = onlyMissing
+      ? '已开始【只补缺失用户详情】，将跳过已有详情、只抓空缺的那些…'
+      : '已开始【全量补抓用户详情】，请看抓取进度…';
+    flash($('#masterMsg'),tip,'warn');
+    await jpost('/city/api/enrich_user',{only_missing:!!onlyMissing});
   }
 
   let pollTimer=null;
@@ -435,10 +465,9 @@ const App=(()=>{
   // ---- 配置 ----
   async function saveConfig(){
     await jpost('/city/api/config',{username:$('#username').value,password:$('#password').value,
-      cookie:$('#cookie').value,front_cookie:$('#frontCookie').value,
+      cookie:$('#cookie').value,master_cookie:$('#masterCookie').value,
       save_dir:$('#saveDir').value,ocr_scale:parseInt($('#ocrScale').value)||1,
-      fetch_workers:parseInt($('#fetchWorkers').value)||4,
-      front_rate:parseFloat($('#frontRate').value)||3,
+      fetch_workers:parseInt($('#fetchWorkers').value)||8,
       fetch_resume_detail:$('#withDetail')&&$('#withDetail').checked?1:0,
       resume_detail_limit:parseInt($('#detailLimit')&&$('#detailLimit').value)||0});
     flash($('#connMsg'),'已保存','ok');
@@ -458,10 +487,9 @@ const App=(()=>{
       const cfg=await jget('/city/api/config');
       $('#username').value=cfg.username||'';$('#password').value=cfg.password||'';
       $('#cookie').value=cfg.cookie||'';$('#saveDir').value=cfg.save_dir||'';
+      $('#masterCookie').value=cfg.master_cookie||'';
       $('#ocrScale').value=cfg.ocr_scale||1;
-      $('#frontCookie').value=cfg.front_cookie||'';
-      $('#fetchWorkers').value=cfg.fetch_workers||4;
-      $('#frontRate').value=(cfg.front_rate===undefined||cfg.front_rate===null)?3:cfg.front_rate;
+      $('#fetchWorkers').value=cfg.fetch_workers||8;
     }catch(err){flash($('#connMsg'),'导入失败：'+err,'err');}
     e.target.value='';
   }
@@ -495,20 +523,12 @@ const App=(()=>{
   function flash(el,t,cls){el.textContent=t;el.className='msg '+cls;}
 
   return {init,fetchOne,fetchAll,loadData,page,renderTable,saveConfig,testCookie,
-          testFrontCookie,enrichResume,enrichJob,
+          testMasterCookie,enrichResume,enrichJob,enrichCompany,enrichUser,
           exportConfig,refreshCaptcha,doLogin,pickDir,doExport,openPath,
           toggleSelAll,selectNone,selectInvert,selectReady,renderExportCats};
 })();
 window.App=App;
 App.init();
 </script>
-
-<div style="position:fixed;left:14px;bottom:14px;z-index:9999">
-  <a href="/" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;
-     padding:8px 14px;border-radius:999px;background:#1b2a4a;color:#dbe6fa;
-     text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:.92"
-     onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.92">
-    &#8592; 综合面板首页</a>
-</div>
 </body>
 </html>
