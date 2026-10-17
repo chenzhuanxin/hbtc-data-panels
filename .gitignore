@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 
+# PyInstaller 构建产物与打包输出（exe 走 GitHub Releases，不入库）
+build/
+dist/
+release_assets/
+
 # 本地运行配置与抓取缓存 —— 含前台/后台登录 Cookie 与抓取数据，切勿提交
 config.json
 *config*.json
